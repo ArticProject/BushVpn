@@ -387,15 +387,18 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
                 }
             }
 
-            // Animated "No internet connection" Overlay (triggers automatically when offline or via header/profile toggle)
+            // Animated "No internet connection" Overlay (triggers automatically when offline or via header toggle)
             AnimatedVisibility(
                 visible = isSystemOffline || isManualOfflinePreview,
-                enter = fadeIn(tween(240)),
-                exit = fadeOut(tween(240))
+                enter = fadeIn(tween(200)),
+                exit = fadeOut(tween(200))
             ) {
                 NoInternetConnectionOverlay(
                     isEnglish = isEnglish,
                     onRetry = {
+                        isSystemOffline = !isNetworkCurrentlyOnline(context)
+                    },
+                    onDismiss = {
                         isManualOfflinePreview = false
                         isSystemOffline = !isNetworkCurrentlyOnline(context)
                     }

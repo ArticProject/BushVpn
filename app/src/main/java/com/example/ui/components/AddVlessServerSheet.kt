@@ -112,7 +112,7 @@ fun AddOrEditVlessDialog(
         )
     }
     var name by remember { mutableStateOf(initialServer?.name ?: "Хельсинки Reality #2") }
-    var host by remember { mutableStateOf(initialServer?.host ?: "fi-hel-02.astralvless.net") }
+    var host by remember { mutableStateOf(initialServer?.host ?: "fi-hel-02.bushvpn.net") }
     var portText by remember { mutableStateOf((initialServer?.port ?: 443).toString()) }
     var uuid by remember { mutableStateOf(initialServer?.uuid ?: VlessParser.generateRandomUuid()) }
     var security by remember { mutableStateOf(initialServer?.security ?: "reality") }
@@ -244,7 +244,7 @@ fun AddOrEditVlessDialog(
                             onValueChange = { uriInput = it },
                             placeholder = {
                                 Text(
-                                    "vless://7f2c1b09-44a8-4d91-b362-8e4a19f05c77@fi-hel-01.astralvless.net:443?encryption=none&security=reality&sni=www.apple.com&fp=chrome&pbk=...&type=tcp&flow=xtls-rprx-vision#HEL-Finland",
+                                    "vless://7f2c1b09-44a8-4d91-b362-8e4a19f05c77@fi-hel-01.bushvpn.net:443?encryption=none&security=reality&sni=www.apple.com&fp=chrome&pbk=...&type=tcp&flow=xtls-rprx-vision#HEL-Finland",
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 11.sp,
                                     color = colors.mutedText
@@ -298,7 +298,7 @@ fun AddOrEditVlessDialog(
                             OutlinedButton(
                                 onClick = {
                                     uriInput =
-                                        "vless://f8c41290-3b19-4e7a-9c44-8a1e72b90d12@se-sto-01.astralvless.net:443?encryption=none&security=reality&sni=www.apple.com&fp=chrome&pbk=mH8X9vR2kP7qW4nL6jF1dC5bV0zX3yA8wE9rT2uI4oP&sid=4a8b12c9&type=tcp&flow=xtls-rprx-vision#Стокгольм"
+                                        "vless://f8c41290-3b19-4e7a-9c44-8a1e72b90d12@se-sto-01.bushvpn.net:443?encryption=none&security=reality&sni=www.apple.com&fp=chrome&pbk=mH8X9vR2kP7qW4nL6jF1dC5bV0zX3yA8wE9rT2uI4oP&sid=4a8b12c9&type=tcp&flow=xtls-rprx-vision#Стокгольм"
                                 },
                                 modifier = Modifier
                                     .weight(1f)
@@ -497,7 +497,7 @@ fun AddOrEditVlessDialog(
                                     countryName = selectedCountry.nameRu,
                                     city = selectedCountry.cityRu,
                                     flagEmoji = selectedCountry.flag,
-                                    host = host.ifBlank { "fi-hel-01.astralvless.net" },
+                                    host = host.ifBlank { "fi-hel-01.bushvpn.net" },
                                     port = portText.toIntOrNull() ?: 443,
                                     uuid = uuid.ifBlank { VlessParser.generateRandomUuid() },
                                     security = security,

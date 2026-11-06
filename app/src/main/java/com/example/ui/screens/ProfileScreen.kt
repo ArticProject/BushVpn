@@ -29,8 +29,6 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.LightMode
-import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.WifiOff
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -59,6 +57,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.MonochromeFistIcon
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalAstralColors
 import com.example.ui.theme.PlusJakartaFontFamily
@@ -355,78 +354,6 @@ fun ProfileScreen(
                     }
                 }
             }
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            // Quick utility pills: Replay Intro & Preview Offline Animation
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(10.dp)
-            ) {
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(50))
-                        .clickable(onClick = onReplayOnboarding)
-                        .border(1.dp, colors.border, RoundedCornerShape(50))
-                        .testTag("replay_onboarding_button"),
-                    color = colors.card,
-                    shape = RoundedCornerShape(50)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.PlayArrow,
-                            contentDescription = "Intro",
-                            tint = colors.primaryInk,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isEnglish) "Replay Intro" else "Онбординг",
-                            fontFamily = PlusJakartaFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            color = colors.primaryInk
-                        )
-                    }
-                }
-
-                Surface(
-                    modifier = Modifier
-                        .weight(1f)
-                        .clip(RoundedCornerShape(50))
-                        .clickable(onClick = onPreviewNoInternet)
-                        .border(1.dp, colors.border, RoundedCornerShape(50))
-                        .testTag("preview_no_internet_button"),
-                    color = colors.card,
-                    shape = RoundedCornerShape(50)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
-                        horizontalArrangement = Arrangement.Center,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.WifiOff,
-                            contentDescription = "Offline animation",
-                            tint = colors.primaryInk,
-                            modifier = Modifier.size(15.dp)
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isEnglish) "Offline State" else "Нет сети (Демо)",
-                            fontFamily = PlusJakartaFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            color = colors.primaryInk
-                        )
-                    }
-                }
-            }
         }
 
         Spacer(modifier = Modifier.height(48.dp))
@@ -471,18 +398,28 @@ fun ProfileScreen(
 
             Spacer(modifier = Modifier.height(24.dp))
 
-            Text(
-                text = "ASTRAL",
-                fontFamily = SpaceGroteskFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 66.sp,
-                letterSpacing = 3.sp,
-                color = colors.watermark,
-                textAlign = TextAlign.Center,
+            Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(bottom = 104.dp)
-            )
+                    .padding(bottom = 104.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "BUSH",
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 60.sp,
+                    letterSpacing = 3.sp,
+                    color = colors.watermark,
+                    textAlign = TextAlign.Center
+                )
+                Spacer(modifier = Modifier.width(12.dp))
+                MonochromeFistIcon(
+                    color = colors.watermark,
+                    size = 48.dp
+                )
+            }
         }
     }
 

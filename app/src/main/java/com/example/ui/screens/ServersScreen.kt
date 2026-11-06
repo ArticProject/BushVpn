@@ -57,6 +57,7 @@ import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.VlessServerEntity
+import com.example.ui.components.MonochromeFistIcon
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalAstralColors
 import com.example.ui.theme.PlusJakartaFontFamily
@@ -93,10 +94,10 @@ fun ServersScreen(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Top Bar: Back Button + Global Nodes + Actions (+ VLESS & Ping)
+        // Top Bar: Clean Back Button matching mockup
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.Start,
             verticalAlignment = Alignment.CenterVertically
         ) {
             IconButton(
@@ -114,77 +115,6 @@ fun ServersScreen(
                     tint = colors.primaryInk,
                     modifier = Modifier.size(18.dp)
                 )
-            }
-
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                // Ping All Button
-                Surface(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .clickable(enabled = !isPingingAll, onClick = onPingAll)
-                        .border(1.dp, colors.border, RoundedCornerShape(50))
-                        .testTag("ping_all_servers_button"),
-                    color = colors.card,
-                    shape = RoundedCornerShape(50)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        if (isPingingAll) {
-                            CircularProgressIndicator(
-                                modifier = Modifier.size(14.dp),
-                                strokeWidth = 2.dp,
-                                color = colors.primaryInk
-                            )
-                        } else {
-                            Icon(
-                                imageVector = Icons.Default.NetworkPing,
-                                contentDescription = "Ping",
-                                tint = colors.primaryInk,
-                                modifier = Modifier.size(15.dp)
-                            )
-                        }
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Text(
-                            text = if (isEnglish) "Ping" else "Пинг",
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            color = colors.primaryInk
-                        )
-                    }
-                }
-
-                // Add VLESS Key Button
-                Surface(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(50))
-                        .clickable(onClick = onAddServerClick)
-                        .testTag("add_vless_server_button"),
-                    color = colors.primaryInk,
-                    shape = RoundedCornerShape(50)
-                ) {
-                    Row(
-                        modifier = Modifier.padding(horizontal = 14.dp, vertical = 8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Add,
-                            contentDescription = "Add VLESS",
-                            tint = colors.onPrimaryInk,
-                            modifier = Modifier.size(16.dp)
-                        )
-                        Spacer(modifier = Modifier.width(4.dp))
-                        Text(
-                            text = "VLESS",
-                            fontFamily = SpaceGroteskFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 12.sp,
-                            color = colors.onPrimaryInk
-                        )
-                    }
-                }
             }
         }
 
@@ -263,7 +193,7 @@ fun ServersScreen(
                 .horizontalScroll(rememberScrollState()),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            val filters = listOf("ALL", "FAVORITES", "P2P", "STREAMING", "REALITY")
+            val filters = listOf("ALL", "FAVORITES", "P2P", "STREAMING")
             filters.forEach { filterKey ->
                 val isSelected = selectedFilter == filterKey
                 Box(
@@ -317,16 +247,26 @@ fun ServersScreen(
 
             item {
                 Spacer(modifier = Modifier.height(20.dp))
-                Text(
-                    text = "ASTRAL",
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 64.sp,
-                    letterSpacing = 3.sp,
-                    color = colors.watermark,
-                    textAlign = TextAlign.Center,
-                    modifier = Modifier.fillMaxWidth()
-                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "BUSH",
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 58.sp,
+                        letterSpacing = 3.sp,
+                        color = colors.watermark,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.width(12.dp))
+                    MonochromeFistIcon(
+                        color = colors.watermark,
+                        size = 48.dp
+                    )
+                }
             }
         }
     }
@@ -419,19 +359,7 @@ private fun GlobalNodeRowCard(
                 )
             }
 
-            // Right Actions: Inspect JSON, Favorite Star, Active Checkmark
-            IconButton(
-                onClick = onInspect,
-                modifier = Modifier.size(32.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Code,
-                    contentDescription = "Inspect VLESS",
-                    tint = colors.secondaryText,
-                    modifier = Modifier.size(17.dp)
-                )
-            }
-
+            // Right Actions: Favorite Star & Selected Checkmark
             if (server.isCustom) {
                 IconButton(
                     onClick = onDelete,

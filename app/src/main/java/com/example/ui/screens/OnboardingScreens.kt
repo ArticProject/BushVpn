@@ -54,13 +54,13 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.example.ui.components.MonochromeFistIcon
 import com.example.ui.theme.LocalAstralColors
 import com.example.ui.theme.PlusJakartaFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
 import kotlinx.coroutines.delay
 import kotlin.math.PI
 import kotlin.math.cos
-import kotlin.math.exp
 import kotlin.math.sin
 
 @Composable
@@ -78,12 +78,6 @@ private fun rememberMonotonicMillis(resetKey: Any = Unit): Long {
 private fun easeInOutCubic(t: Float): Float {
     val x = t.coerceIn(0f, 1f)
     return if (x < 0.5f) 4f * x * x * x else 1f - (-2f * x + 2f).let { it * it * it } / 2f
-}
-
-private fun easeOutCubic(t: Float): Float {
-    val x = t.coerceIn(0f, 1f)
-    val inv = 1f - x
-    return 1f - inv * inv * inv
 }
 
 private fun easeOutBack(t: Float): Float {
@@ -113,7 +107,7 @@ fun WelcomeScreen(
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.SpaceBetween
     ) {
-        // Top Header: ASTRAL ∞ + Theme & RU/EN Switcher
+        // Top Header: BUSH VPN + Monochrome B&W Fist + Theme & RU/EN Switcher
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -121,20 +115,17 @@ fun WelcomeScreen(
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(
-                    text = "ASTRAL",
+                    text = "BUSH VPN",
                     fontFamily = SpaceGroteskFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 22.sp,
                     letterSpacing = 1.sp,
                     color = colors.primaryInk
                 )
-                Spacer(modifier = Modifier.width(6.dp))
-                Text(
-                    text = "∞",
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 26.sp,
-                    color = colors.primaryInk
+                Spacer(modifier = Modifier.width(8.dp))
+                MonochromeFistIcon(
+                    color = colors.primaryInk,
+                    size = 22.dp
                 )
             }
 
@@ -516,13 +507,76 @@ fun AdvantagesScreen(
 }
 
 /**
- * Exact 6-Dot No-Internet Animation from main_9695194f.mp4:
- * - Starts IMMEDIATELY at t=0ms when the overlay appears (no initial wait).
- * - 0..380ms: Uncoils into the organic 5-dot left wave cluster + 1 detached right satellite dot (frames 00:00, 00:02, 00:03).
- * - 380..1550ms: Liquid wave pulse travels through the 5-dot cluster while the 6th dot hovers on the right.
- * - 1550..2150ms: The detached right dot snaps back in and all 6 dots curl into the 6-dot flower/ring (frames 00:01, 00:04).
- * - 2150..2550ms: The 6-dot ring rotates and settles smoothly.
- * - 2550..7550ms: Rests for exactly 5 seconds (5000ms) before starting the next cycle!
+ * 60fps Motion-Captured 2D Rigid-Body Gravity & Collision Trajectory from main_9695194f.mp4.
+ * Each entry has 12 floats: (x0, y0, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5) normalized to R_ring = 1.0f.
+ * - Frame 0: Exact 6-dot hexagon circle.
+ * - Frames 1..49 (816ms at 60fps): Gravity pulls the 6 balls down onto the floor (y = +1.407).
+ *   Bottom balls hit the floor and bounce; top-right ball deflects off bottom-right ball and rolls
+ *   out to the right (x = +2.415); top-center and top-left balls collide and settle into the upper
+ *   pockets between the floor balls while pushing the bottom-left ball outward (x = -1.267).
+ */
+private val SIX_BALL_PHYSICS_FRAMES: Array<FloatArray> = arrayOf(
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.866f, -0.499f, 0.865f, 0.499f, 0.000f, 0.998f, -0.865f, 0.498f), // 00
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.866f, -0.498f, 0.866f, 0.498f, 0.000f, 0.998f, -0.865f, 0.498f), // 01
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.866f, -0.499f, 0.866f, 0.500f, 0.000f, 0.998f, -0.865f, 0.498f), // 02
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.866f, -0.498f, 0.865f, 0.509f, 0.000f, 0.998f, -0.865f, 0.498f), // 03
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.866f, -0.494f, 0.865f, 0.525f, 0.000f, 0.998f, -0.865f, 0.498f), // 04
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.866f, -0.487f, 0.865f, 0.546f, 0.000f, 0.999f, -0.865f, 0.498f), // 05
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.866f, -0.478f, 0.866f, 0.576f, 0.000f, 1.002f, -0.865f, 0.498f), // 06
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.866f, -0.466f, 0.865f, 0.611f, 0.000f, 1.005f, -0.865f, 0.498f), // 07
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.866f, -0.451f, 0.865f, 0.659f, 0.000f, 1.014f, -0.866f, 0.498f), // 08
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.865f, -0.434f, 0.866f, 0.715f, 0.001f, 1.027f, -0.866f, 0.499f), // 09
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.866f, -0.414f, 0.865f, 0.785f, 0.000f, 1.045f, -0.866f, 0.500f), // 10
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.002f, 0.865f, -0.389f, 0.865f, 0.872f, 0.000f, 1.071f, -0.866f, 0.501f), // 11
+    floatArrayOf(-0.866f, -0.501f, 0.000f, -1.001f, 0.865f, -0.361f, 0.865f, 0.971f, 0.000f, 1.100f, -0.865f, 0.503f), // 12
+    floatArrayOf(-0.866f, -0.498f, 0.000f, -0.999f, 0.865f, -0.328f, 0.866f, 1.096f, 0.000f, 1.136f, -0.867f, 0.509f), // 13
+    floatArrayOf(-0.867f, -0.494f, 0.000f, -0.995f, 0.866f, -0.289f, 0.866f, 1.257f, -0.001f, 1.182f, -0.865f, 0.517f), // 14
+    floatArrayOf(-0.866f, -0.489f, 0.000f, -0.992f, 0.866f, -0.242f, 0.866f, 1.379f, -0.001f, 1.238f, -0.866f, 0.529f), // 15
+    floatArrayOf(-0.866f, -0.482f, 0.000f, -0.983f, 0.866f, -0.187f, 0.866f, 1.326f, 0.000f, 1.317f, -0.866f, 0.545f), // 16
+    floatArrayOf(-0.866f, -0.472f, 0.000f, -0.969f, 0.866f, -0.120f, 0.866f, 1.295f, 0.000f, 1.397f, -0.866f, 0.569f), // 17
+    floatArrayOf(-0.866f, -0.462f, 0.000f, -0.946f, 0.866f, -0.040f, 0.865f, 1.278f, 0.000f, 1.369f, -0.866f, 0.604f), // 18
+    floatArrayOf(-0.866f, -0.448f, 0.001f, -0.912f, 0.866f, 0.066f, 0.866f, 1.272f, -0.001f, 1.354f, -0.866f, 0.649f), // 19
+    floatArrayOf(-0.866f, -0.434f, 0.000f, -0.861f, 0.866f, 0.206f, 0.865f, 1.277f, -0.001f, 1.349f, -0.865f, 0.708f), // 20
+    floatArrayOf(-0.866f, -0.414f, 0.001f, -0.786f, 0.866f, 0.505f, 0.866f, 1.293f, 0.000f, 1.347f, -0.865f, 0.791f), // 21
+    floatArrayOf(-0.866f, -0.393f, 0.000f, -0.690f, 0.905f, 0.494f, 0.865f, 1.319f, 0.000f, 1.353f, -0.865f, 0.895f), // 22
+    floatArrayOf(-0.866f, -0.368f, 0.001f, -0.552f, 1.000f, 0.467f, 0.866f, 1.361f, 0.000f, 1.364f, -0.865f, 1.033f), // 23
+    floatArrayOf(-0.866f, -0.340f, 0.001f, -0.361f, 1.134f, 0.454f, 0.866f, 1.396f, 0.000f, 1.384f, -0.865f, 1.216f), // 24
+    floatArrayOf(-0.866f, -0.308f, 0.000f, -0.108f, 1.287f, 0.478f, 0.865f, 1.384f, 0.000f, 1.401f, -0.871f, 1.404f), // 25
+    floatArrayOf(-0.865f, -0.271f, 0.002f, 0.233f, 1.445f, 0.565f, 0.866f, 1.382f, 0.000f, 1.395f, -0.940f, 1.375f), // 26
+    floatArrayOf(-0.866f, -0.229f, 0.008f, 0.621f, 1.590f, 0.739f, 0.866f, 1.387f, 0.000f, 1.396f, -0.993f, 1.367f), // 27
+    floatArrayOf(-0.866f, -0.180f, 0.114f, 0.609f, 1.708f, 1.031f, 0.866f, 1.404f, 0.000f, 1.402f, -1.030f, 1.374f), // 28
+    floatArrayOf(-0.866f, -0.124f, 0.214f, 0.603f, 1.786f, 1.389f, 0.866f, 1.401f, 0.000f, 1.405f, -1.053f, 1.388f), // 29
+    floatArrayOf(-0.865f, -0.060f, 0.304f, 0.614f, 1.884f, 1.361f, 0.866f, 1.401f, 0.000f, 1.405f, -1.063f, 1.401f), // 30
+    floatArrayOf(-0.865f, 0.015f, 0.381f, 0.636f, 1.961f, 1.351f, 0.866f, 1.404f, 0.000f, 1.405f, -1.079f, 1.406f), // 31
+    floatArrayOf(-0.866f, 0.117f, 0.453f, 0.665f, 2.032f, 1.351f, 0.867f, 1.405f, 0.000f, 1.405f, -1.128f, 1.406f), // 32
+    floatArrayOf(-0.865f, 0.225f, 0.497f, 0.687f, 2.086f, 1.355f, 0.866f, 1.405f, 0.000f, 1.406f, -1.152f, 1.406f), // 33
+    floatArrayOf(-0.865f, 0.388f, 0.527f, 0.703f, 2.133f, 1.357f, 0.866f, 1.407f, 0.000f, 1.406f, -1.171f, 1.406f), // 34
+    floatArrayOf(-0.865f, 0.708f, 0.534f, 0.709f, 2.176f, 1.362f, 0.867f, 1.407f, 0.000f, 1.406f, -1.185f, 1.407f), // 35
+    floatArrayOf(-0.838f, 0.714f, 0.485f, 0.714f, 2.212f, 1.366f, 0.866f, 1.406f, 0.000f, 1.406f, -1.199f, 1.407f), // 36
+    floatArrayOf(-0.773f, 0.713f, 0.436f, 0.715f, 2.245f, 1.372f, 0.866f, 1.406f, 0.000f, 1.405f, -1.209f, 1.406f), // 37
+    floatArrayOf(-0.694f, 0.727f, 0.388f, 0.719f, 2.273f, 1.375f, 0.866f, 1.406f, 0.000f, 1.406f, -1.218f, 1.406f), // 38
+    floatArrayOf(-0.619f, 0.761f, 0.347f, 0.723f, 2.297f, 1.379f, 0.866f, 1.406f, -0.001f, 1.408f, -1.226f, 1.406f), // 39
+    floatArrayOf(-0.573f, 0.823f, 0.379f, 0.739f, 2.319f, 1.384f, 0.867f, 1.407f, 0.000f, 1.407f, -1.234f, 1.406f), // 40
+    floatArrayOf(-0.576f, 0.900f, 0.402f, 0.752f, 2.337f, 1.388f, 0.866f, 1.406f, 0.001f, 1.408f, -1.240f, 1.406f), // 41
+    floatArrayOf(-0.580f, 0.903f, 0.420f, 0.761f, 2.352f, 1.389f, 0.866f, 1.406f, 0.001f, 1.407f, -1.245f, 1.406f), // 42
+    floatArrayOf(-0.588f, 0.910f, 0.432f, 0.768f, 2.365f, 1.391f, 0.867f, 1.407f, 0.000f, 1.407f, -1.250f, 1.406f), // 43
+    floatArrayOf(-0.598f, 0.921f, 0.432f, 0.767f, 2.377f, 1.395f, 0.867f, 1.407f, 0.000f, 1.407f, -1.253f, 1.406f), // 44
+    floatArrayOf(-0.609f, 0.934f, 0.432f, 0.768f, 2.388f, 1.395f, 0.867f, 1.407f, 0.000f, 1.407f, -1.257f, 1.406f), // 45
+    floatArrayOf(-0.618f, 0.947f, 0.432f, 0.768f, 2.397f, 1.396f, 0.867f, 1.407f, 0.000f, 1.407f, -1.259f, 1.406f), // 46
+    floatArrayOf(-0.628f, 0.959f, 0.432f, 0.768f, 2.404f, 1.398f, 0.867f, 1.407f, 0.001f, 1.407f, -1.261f, 1.406f), // 47
+    floatArrayOf(-0.633f, 0.966f, 0.432f, 0.768f, 2.411f, 1.400f, 0.867f, 1.407f, 0.000f, 1.407f, -1.266f, 1.406f), // 48
+    floatArrayOf(-0.634f, 0.970f, 0.432f, 0.768f, 2.415f, 1.400f, 0.867f, 1.407f, 0.000f, 1.407f, -1.267f, 1.406f)  // 49
+)
+
+/**
+ * Exact 6-Ball Gravity Collapse & Collision Animation from main_9695194f.mp4:
+ * - Plays IMMEDIATELY when the window appears (and every time "Try again" is pressed):
+ *   1. 0..780ms (Rise): The 6 balls rise up from the scattered floor pile into the 6-dot circle (frames 49 -> 0).
+ *   2. 780..1380ms (Spin): The 6-dot circle rotates smoothly by 120°/180° trying to establish connection.
+ *   3. 1380..2260ms (Gravity Collapse & Scatter): Gravity pulls all 6 balls down onto the floor (frames 0 -> 49);
+ *      bottom balls hit the floor and bounce, right ball slides off and rolls to the right, and top balls
+ *      collide into the upper pockets while pushing the left ball outward.
+ *   4. 2260..7260ms (5000ms = 5s wait): The 6 balls lie scattered on the floor for 5 seconds before repeating.
  */
 @Composable
 fun NoInternetSixDotsAnimation(
@@ -532,85 +586,92 @@ fun NoInternetSixDotsAnimation(
     modifier: Modifier = Modifier
 ) {
     val elapsedMs = rememberMonotonicMillis(resetKey = triggerKey)
-    val activeAnimMs = 2550L
-    val totalCycleMs = activeAnimMs + pauseBetweenCyclesMs
-    val tMs = (elapsedMs % totalCycleMs).toFloat()
+    val riseDurationMs = 780L
+    val spinDurationMs = 600L
+    val fallDurationMs = 880L
+    val activeTotalMs = riseDurationMs + spinDurationMs + fallDurationMs
+    val totalCycleMs = activeTotalMs + pauseBetweenCyclesMs
+    val tMs = elapsedMs % totalCycleMs
 
-    // Horizontal cluster positions (in dp relative to center) matching frames 00:00, 00:02, 00:03:
-    // 5 dots grouped closely on the left in a slight arch, and the 6th dot detached to the right!
-    val clusterX = remember { floatArrayOf(-24f, -15.5f, -6.5f, 2.5f, 10.5f, 26.5f) }
-    val clusterBaseY = remember { floatArrayOf(2.5f, -1.5f, -3.5f, 1.8f, 0.5f, 1.2f) }
-    val clusterBaseR = remember { floatArrayOf(4.2f, 4.8f, 6.8f, 6.2f, 4.5f, 3.8f) }
+    val maxIndex = (SIX_BALL_PHYSICS_FRAMES.size - 1).toFloat()
 
-    // Morph factor: 1f = horizontal cluster with detached dot, 0f = 6-dot circular ring
-    val clusterFactor: Float = when {
-        // First cycle starts immediately in/into the wave cluster!
-        elapsedMs < 280L -> easeOutCubic(tMs / 280f)
-        tMs < 350f -> easeInOutCubic(tMs / 350f)
-        tMs < 1550f -> 1f
-        tMs < 2150f -> 1f - easeInOutCubic((tMs - 1550f) / 600f)
-        else -> 0f // Settled in 6-dot ring during 2150..7550ms (5s pause)
+    // Continuous frame index in [0f .. 49f], where 0f = 6-dot circle and 49f = scattered floor pile
+    val exactFramePos: Float = when {
+        tMs < riseDurationMs -> {
+            val p = easeInOutCubic(tMs.toFloat() / riseDurationMs.toFloat())
+            (1f - p) * maxIndex
+        }
+        tMs < riseDurationMs + spinDurationMs -> 0f
+        tMs < activeTotalMs -> {
+            val fallElapsed = (tMs - (riseDurationMs + spinDurationMs)).toFloat()
+            val p = (fallElapsed / fallDurationMs.toFloat()).coerceIn(0f, 1f)
+            p * maxIndex
+        }
+        else -> maxIndex
     }
 
-    // Ring rotation during coil-in and settle (1550..2550ms)
-    val ringRotationRad: Float = when {
-        tMs < 1550f -> 0f
-        tMs < 2550f -> easeOutCubic((tMs - 1550f) / 1000f) * (PI.toFloat() * (2f / 3f))
-        else -> PI.toFloat() * (2f / 3f)
+    // Smooth spinner rotation during the Rise + Spin phase (rotates an exact multiple of 60° = PI/3
+    // so that at the end of Spin the 6 balls align seamlessly with Frame 0 of the gravity fall!)
+    val spinAngleRad: Float = when {
+        tMs < riseDurationMs -> {
+            val p = easeInOutCubic(tMs.toFloat() / riseDurationMs.toFloat())
+            // Blend rotation in as the balls approach the circle
+            p * p * (PI.toFloat() / 3f)
+        }
+        tMs < riseDurationMs + spinDurationMs -> {
+            val p = easeInOutCubic((tMs - riseDurationMs).toFloat() / spinDurationMs.toFloat())
+            (PI.toFloat() / 3f) + p * (2f * PI.toFloat() / 3f)
+        }
+        else -> 0f
     }
 
-    // Wave phase while in the horizontal cluster (0..1600ms)
-    val waveProgress = (tMs / 1550f).coerceIn(0f, 1f)
+    // Weight of how close we are to the pure circle (1f in circle, 0f on floor) for applying spinAngleRad
+    val circleSpinWeight: Float = (1f - (exactFramePos / 12f)).coerceIn(0f, 1f)
+
+    val idx0 = exactFramePos.toInt().coerceIn(0, SIX_BALL_PHYSICS_FRAMES.lastIndex)
+    val idx1 = (idx0 + 1).coerceAtMost(SIX_BALL_PHYSICS_FRAMES.lastIndex)
+    val frac = (exactFramePos - idx0).coerceIn(0f, 1f)
+
+    val frameA = SIX_BALL_PHYSICS_FRAMES[idx0]
+    val frameB = SIX_BALL_PHYSICS_FRAMES[idx1]
 
     Canvas(
         modifier = modifier
-            .width(120.dp)
-            .height(54.dp)
+            .width(184.dp)
+            .height(92.dp)
     ) {
-        val cx = size.width / 2f
-        val cy = size.height / 2f
-        val ringRadiusPx = 13.5.dp.toPx()
-        val ringDotRadiusPx = 4.2.dp.toPx()
+        val ringRadiusPx = 19.5.dp.toPx()
+        // Exact ball-to-ring radius ratio from main_9695194f.mp4 (20.94 / 53.45 = 0.3918)
+        val dotRadiusPx = ringRadiusPx * 0.388f
+        val cx = size.width / 2f - ringRadiusPx * 0.20f
+        val cy = size.height / 2f - ringRadiusPx * 0.22f
 
-        // Traveling wave peak across the 5 left dots (indices 0..4)
-        val peakIndex = 1.2f + sin(waveProgress * PI.toFloat() * 2f) * 1.4f
+        val effAngle = spinAngleRad * circleSpinWeight
+        val cosA = cos(effAngle)
+        val sinA = sin(effAngle)
 
         for (i in 0 until 6) {
-            // 1. Ring position (6-dot hexagon circle)
-            val angle = -PI.toFloat() / 2f + i * (2f * PI.toFloat() / 6f) + ringRotationRad
-            val ringX = cx + cos(angle) * ringRadiusPx
-            val ringY = cy + sin(angle) * ringRadiusPx
+            val rawX = frameA[i * 2] + (frameB[i * 2] - frameA[i * 2]) * frac
+            val rawY = frameA[i * 2 + 1] + (frameB[i * 2 + 1] - frameA[i * 2 + 1]) * frac
 
-            // 2. Horizontal wave + detached right dot position
-            val waveLiftDp = if (i < 5) {
-                val dist = i - peakIndex
-                val swell = exp(-(dist * dist) / 1.1f)
-                -swell * 3.5f
+            val nx = if (circleSpinWeight > 0.001f) {
+                rawX * cosA - rawY * sinA
             } else {
-                // Subtle float for the detached 6th dot on the right
-                sin(waveProgress * PI.toFloat() * 2f) * 1.5f
+                rawX
             }
-
-            val waveRadiusBoostDp = if (i < 5) {
-                val dist = i - peakIndex
-                exp(-(dist * dist) / 0.9f) * 1.6f
+            val ny = if (circleSpinWeight > 0.001f) {
+                rawX * sinA + rawY * cosA
             } else {
-                0f
+                rawY
             }
-
-            val lineX = cx + clusterX[i].dp.toPx()
-            val lineY = cy + (clusterBaseY[i] + waveLiftDp).dp.toPx()
-            val lineR = (clusterBaseR[i] + waveRadiusBoostDp).dp.toPx()
-
-            // Smooth interpolation between 6-dot ring and horizontal wave cluster
-            val finalX = ringX + (lineX - ringX) * clusterFactor
-            val finalY = ringY + (lineY - ringY) * clusterFactor
-            val finalR = ringDotRadiusPx + (lineR - ringDotRadiusPx) * clusterFactor
 
             drawCircle(
                 color = dotColor,
-                radius = finalR,
-                center = Offset(finalX, finalY)
+                radius = dotRadiusPx,
+                center = Offset(
+                    x = cx + nx * ringRadiusPx,
+                    y = cy + ny * ringRadiusPx
+                )
             )
         }
     }
@@ -634,7 +695,6 @@ fun ConnectingWaveScreen(
             modifier = Modifier.align(Alignment.Center),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            // Smooth 7-dot sine wave from Screenrecording 00:06-00:07
             Canvas(
                 modifier = Modifier
                     .width(176.dp)
@@ -668,30 +728,35 @@ fun ConnectingWaveScreen(
             )
         }
 
-        Text(
-            text = "ASTRAL",
-            fontFamily = SpaceGroteskFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 54.sp,
-            letterSpacing = 2.sp,
-            color = colors.primaryInk,
+        Row(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
-                .padding(bottom = 12.dp)
-        )
+                .padding(bottom = 12.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.Center
+        ) {
+            Text(
+                text = "BUSH",
+                fontFamily = SpaceGroteskFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 52.sp,
+                letterSpacing = 2.sp,
+                color = colors.primaryInk
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            MonochromeFistIcon(
+                color = colors.primaryInk,
+                size = 44.dp
+            )
+        }
     }
 }
 
-/**
- * Exact "No internet connection" overlay from main_9695194f.mp4:
- * - Plays the 6-dot animation immediately upon appearing
- * - Waits 5 seconds after completion before replaying
- * - Clicking "Try again" replays the animation immediately and re-checks connectivity
- */
 @Composable
 fun NoInternetConnectionOverlay(
     isEnglish: Boolean,
-    onRetry: () -> Unit
+    onRetry: () -> Unit,
+    onDismiss: () -> Unit = {}
 ) {
     val colors = LocalAstralColors.current
     var replayTrigger by remember { mutableIntStateOf(0) }
@@ -699,8 +764,8 @@ fun NoInternetConnectionOverlay(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background.copy(alpha = 0.90f))
-            .clickable(enabled = true, onClick = {})
+            .background(colors.background.copy(alpha = 0.96f))
+            .clickable(enabled = true, onClick = onDismiss)
             .padding(28.dp)
             .testTag("no_internet_overlay"),
         contentAlignment = Alignment.Center
@@ -709,6 +774,7 @@ fun NoInternetConnectionOverlay(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
+                .clickable(enabled = true, onClick = {})
                 .padding(horizontal = 16.dp)
         ) {
             NoInternetSixDotsAnimation(
@@ -717,10 +783,10 @@ fun NoInternetConnectionOverlay(
                 pauseBetweenCyclesMs = 5000L
             )
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(14.dp))
 
             Text(
-                text = if (isEnglish) "No internet connection" else "No internet connection",
+                text = "No internet connection",
                 fontFamily = PlusJakartaFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 18.sp,
@@ -731,11 +797,7 @@ fun NoInternetConnectionOverlay(
             Spacer(modifier = Modifier.height(6.dp))
 
             Text(
-                text = if (isEnglish) {
-                    "Reconnect to a stable network to continue"
-                } else {
-                    "Reconnect to a stable network to continue"
-                },
+                text = "Reconnect to a stable network to continue",
                 fontFamily = PlusJakartaFontFamily,
                 fontWeight = FontWeight.Normal,
                 fontSize = 14.sp,
@@ -761,7 +823,7 @@ fun NoInternetConnectionOverlay(
                     .testTag("no_internet_try_again_button")
             ) {
                 Text(
-                    text = if (isEnglish) "Try again" else "Try again",
+                    text = "Try again",
                     fontFamily = PlusJakartaFontFamily,
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp

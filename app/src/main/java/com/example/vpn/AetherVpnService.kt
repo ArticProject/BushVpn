@@ -97,8 +97,8 @@ class AetherVpnService : VpnService() {
             )
 
             val notification: Notification = NotificationCompat.Builder(this, channelId)
-                .setSmallIcon(android.R.drawable.ic_lock_lock)
-                .setContentTitle("AetherVPN • $serverName")
+                .setSmallIcon(R.drawable.ic_fist_bw)
+                .setContentTitle("Bush VPN • $serverName")
                 .setContentText("Туннель VLESS REALITY активен ($serverHost)")
                 .setContentIntent(pendingIntent)
                 .setOngoing(true)

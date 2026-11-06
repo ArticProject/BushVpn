@@ -22,6 +22,6 @@ dependencyResolutionManagement {
   }
 }
 
-rootProject.name = "Astral"
+rootProject.name = "Bush VPN"
 
 include(":app")

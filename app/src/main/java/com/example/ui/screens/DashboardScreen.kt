@@ -28,7 +28,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PowerSettingsNew
@@ -59,6 +58,7 @@ import androidx.compose.ui.unit.sp
 import com.example.R
 import com.example.data.VlessServerEntity
 import com.example.ui.VpnConnectionStatus
+import com.example.ui.components.MonochromeFistIcon
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalAstralColors
 import com.example.ui.theme.PlusJakartaFontFamily
@@ -123,26 +123,23 @@ fun DashboardScreen(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        // Top Header Bar: ∞ ASTRAL on left | HEL pill + RU/EN + Offline Demo + Theme button on right
+        // Top Header Bar: Monochrome Fist + BUSH VPN on left | HEL pill + RU/EN + Offline Demo + Theme button on right
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
             Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = "∞",
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 26.sp,
-                    color = colors.primaryInk
+                MonochromeFistIcon(
+                    color = colors.primaryInk,
+                    size = 22.dp
                 )
                 Spacer(modifier = Modifier.width(8.dp))
                 Text(
-                    text = "ASTRAL",
+                    text = "BUSH VPN",
                     fontFamily = SpaceGroteskFontFamily,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 21.sp,
+                    fontSize = 20.sp,
                     letterSpacing = 0.5.sp,
                     color = colors.primaryInk
                 )
@@ -299,28 +296,37 @@ fun DashboardScreen(
                 }
             }
 
-            // Center Circular Power Button with Pulsing Rings (CONNECT / LINKING / ACTIVE)
+            // Center Circular Power Button with 60fps Pulsing Rings (CONNECT / LINKING / ACTIVE)
             Box(
                 modifier = Modifier
-                    .size(180.dp)
+                    .size(188.dp)
                     .align(Alignment.Center),
                 contentAlignment = Alignment.Center
             ) {
-                if (connectionStatus != VpnConnectionStatus.DISCONNECTED) {
-                    Canvas(modifier = Modifier.fillMaxSize()) {
-                        val center = Offset(size.width / 2f, size.height / 2f)
-                        val baseR = 52.dp.toPx()
+                Canvas(modifier = Modifier.fillMaxSize()) {
+                    val center = Offset(size.width / 2f, size.height / 2f)
+                    val baseR = 53.dp.toPx()
 
+                    if (connectionStatus == VpnConnectionStatus.DISCONNECTED) {
+                        // Subtle breathing halo in idle state
                         drawCircle(
-                            color = Color.White.copy(alpha = ringAlpha1),
+                            color = Color.White.copy(alpha = ringAlpha1 * 0.42f),
+                            radius = baseR * (1f + (ringScale1 - 1f) * 0.55f),
+                            center = center,
+                            style = Stroke(width = 1.2.dp.toPx())
+                        )
+                    } else {
+                        // Strong sonar waves in LINKING / CONNECTED state
+                        drawCircle(
+                            color = Color.White.copy(alpha = ringAlpha1 * 0.65f),
                             radius = baseR * ringScale1,
                             center = center
                         )
                         drawCircle(
-                            color = Color.White.copy(alpha = ringAlpha1 * 0.65f),
+                            color = Color.White.copy(alpha = ringAlpha1 * 0.85f),
                             radius = baseR * ringScale2,
                             center = center,
-                            style = Stroke(width = 1.5.dp.toPx())
+                            style = Stroke(width = 1.8.dp.toPx())
                         )
                     }
                 }
@@ -487,66 +493,30 @@ fun DashboardScreen(
         Spacer(modifier = Modifier.height(26.dp))
 
         // FEATURED / Selected nodes Section Header
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
-            verticalAlignment = Alignment.Bottom
-        ) {
-            Column {
-                Text(
-                    text = "FEATURED",
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 11.sp,
-                    letterSpacing = 1.5.sp,
-                    color = colors.secondaryText
-                )
-                Spacer(modifier = Modifier.height(2.dp))
-                Text(
-                    text = "Selected nodes",
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 24.sp,
-                    color = colors.primaryInk
-                )
-                Text(
-                    text = "A quick edit from the full network.",
-                    fontFamily = PlusJakartaFontFamily,
-                    fontWeight = FontWeight.Normal,
-                    fontSize = 13.sp,
-                    color = colors.secondaryText
-                )
-            }
-
-            Surface(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .clickable(onClick = onOpenAddServer)
-                    .border(1.dp, colors.border, RoundedCornerShape(50))
-                    .testTag("quick_add_vless_button"),
-                color = colors.card,
-                shape = RoundedCornerShape(50)
-            ) {
-                Row(
-                    modifier = Modifier.padding(horizontal = 12.dp, vertical = 7.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Add,
-                        contentDescription = "Add VLESS",
-                        tint = colors.primaryInk,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(
-                        text = "VLESS",
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 11.sp,
-                        color = colors.primaryInk
-                    )
-                }
-            }
+        Column(modifier = Modifier.fillMaxWidth()) {
+            Text(
+                text = "FEATURED",
+                fontFamily = SpaceGroteskFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 11.sp,
+                letterSpacing = 1.5.sp,
+                color = colors.secondaryText
+            )
+            Spacer(modifier = Modifier.height(2.dp))
+            Text(
+                text = "Selected nodes",
+                fontFamily = SpaceGroteskFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 24.sp,
+                color = colors.primaryInk
+            )
+            Text(
+                text = "A quick edit from the full network.",
+                fontFamily = PlusJakartaFontFamily,
+                fontWeight = FontWeight.Normal,
+                fontSize = 13.sp,
+                color = colors.secondaryText
+            )
         }
 
         Spacer(modifier = Modifier.height(14.dp))
@@ -578,18 +548,28 @@ fun DashboardScreen(
 
         Spacer(modifier = Modifier.height(24.dp))
 
-        Text(
-            text = "ASTRAL",
-            fontFamily = SpaceGroteskFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 64.sp,
-            letterSpacing = 3.sp,
-            color = colors.watermark,
-            textAlign = TextAlign.Center,
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(bottom = 96.dp)
-        )
+                .padding(bottom = 96.dp),
+            horizontalArrangement = Arrangement.Center,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "BUSH",
+                fontFamily = SpaceGroteskFontFamily,
+                fontWeight = FontWeight.Bold,
+                fontSize = 58.sp,
+                letterSpacing = 3.sp,
+                color = colors.watermark,
+                textAlign = TextAlign.Center
+            )
+            Spacer(modifier = Modifier.width(12.dp))
+            MonochromeFistIcon(
+                color = colors.watermark,
+                size = 48.dp
+            )
+        }
     }
 }
 

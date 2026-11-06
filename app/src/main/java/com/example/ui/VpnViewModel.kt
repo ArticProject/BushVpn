@@ -179,7 +179,7 @@ class VpnViewModel(
     init {
         viewModelScope.launch {
             repository.ensureSeeded()
-            appendLog("INFO", "ASTRAL ∞ Sovereign X-Ray Core 1.8.24 initialized (VLESS REALITY)")
+            appendLog("INFO", "BUSH VPN 👊 Sovereign X-Ray Core 1.8.24 initialized (VLESS REALITY)")
         }
     }
 
