@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">Astral</string>
+    <string name="vpn_service_label">ASTRAL ∞ Sovereign Tunnel</string>
+    <string name="notification_channel_name">ASTRAL ∞ Tunnel Status</string>
+    <string name="notification_channel_desc">Notifications for active VLESS REALITY cryptographic tunnel</string>
+</resources>

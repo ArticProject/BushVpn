@@ -1,0 +1,6 @@
+{
+  "name": "Astral",
+  "description": "Sovereign VLESS REALITY VPN client with handcrafted monochrome aesthetics, multi-country enclaves, live ping, and X-Ray core routing.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
