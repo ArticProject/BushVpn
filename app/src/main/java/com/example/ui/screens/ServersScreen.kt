@@ -421,7 +421,7 @@ fun ServersScreen(
 }
 
 @Composable
-private fun IncyTopActionButton(
+internal fun IncyTopActionButton(
     icon: ImageVector,
     contentDescription: String,
     isLoading: Boolean = false,
@@ -460,7 +460,7 @@ private fun IncyTopActionButton(
 }
 
 @Composable
-private fun IncyProviderGroupCard(
+internal fun IncyProviderGroupCard(
     providerTitle: String,
     lastUpdatedLabel: String,
     leftStatusLabel: String,

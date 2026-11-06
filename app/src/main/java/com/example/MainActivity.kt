@@ -279,6 +279,8 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
                                     allServers = allServers,
                                     isEnglish = isEnglish,
                                     isDarkTheme = isDarkTheme,
+                                    isPingingAll = isPingingAll,
+                                    pingingServerIds = pingingServerIds,
                                     onToggleLanguage = vpnViewModel::toggleLanguage,
                                     onToggleTheme = vpnViewModel::toggleTheme,
                                     onToggleConnection = handleToggleConnection,
@@ -289,6 +291,10 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
                                         showAddOrEditDialog = true
                                     },
                                     onOpenXrayConfig = { srv -> inspectingXrayServer = srv },
+                                    onPingServer = vpnViewModel::pingSingleServer,
+                                    onPingAll = vpnViewModel::pingAllServers,
+                                    onImportSubscriptionText = vpnViewModel::importSubscriptionOrUri,
+                                    onCopiedMessage = vpnViewModel::showMessage,
                                     onDeleteServer = vpnViewModel::deleteServer,
                                     onTriggerNoInternetDemo = { isManualOfflinePreview = true }
                                 )
