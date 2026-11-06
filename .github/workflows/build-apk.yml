@@ -1,4 +1,4 @@
-name: Build & Release Bush VPN APK
+name: Publish Bush VPN APK
 
 on:
   push:
@@ -9,45 +9,25 @@ permissions:
   contents: write
 
 jobs:
-  build-apk:
+  release-apk:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up JDK 17
-        uses: actions/setup-java@v4
-        with:
-          java-version: '17'
-          distribution: 'temurin'
-
-      - name: Setup Android SDK
-        uses: android-actions/setup-android@v3
-
-      - name: Install Gradle 8.11.1
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '8.11.1'
-
-      - name: Build Bush VPN Debug APK
-        run: gradle assembleDebug
-
-      - name: Copy APK to Bush-VPN.apk
-        run: cp app/build/outputs/apk/debug/app-debug.apk Bush-VPN.apk
-
-      - name: Upload Bush-VPN.apk Artifact
+      - name: Upload Bush-VPN.apk to Actions Artifacts
         uses: actions/upload-artifact@v4
         with:
           name: Bush-VPN-APK
           path: Bush-VPN.apk
 
-      - name: Publish APK to GitHub Releases
+      - name: Publish Bush-VPN.apk to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0-bush
-          name: "Bush VPN 👊 (Latest APK)"
-          body: "Прямое скачивание готового установочного файла **Bush-VPN.apk** для Android (VLESS / REALITY / X-Ray)."
+          tag_name: v1.0.0
+          name: "Bush VPN (Android APK)"
+          body: "Нажми на **Bush-VPN.apk** ниже в разделе Assets, чтобы скачать и установить приложение на Android."
           files: Bush-VPN.apk
           prerelease: false
         env:
