@@ -289,6 +289,7 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
                                         showAddOrEditDialog = true
                                     },
                                     onOpenXrayConfig = { srv -> inspectingXrayServer = srv },
+                                    onDeleteServer = vpnViewModel::deleteServer,
                                     onTriggerNoInternetDemo = { isManualOfflinePreview = true }
                                 )
 
@@ -315,7 +316,10 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
                                         showAddOrEditDialog = true
                                     },
                                     onDeleteServerClick = vpnViewModel::deleteServer,
-                                    onOpenXrayConfig = { srv -> inspectingXrayServer = srv }
+                                    onOpenXrayConfig = { srv -> inspectingXrayServer = srv },
+                                    onImportSubscriptionText = vpnViewModel::importSubscriptionOrUri,
+                                    onToggleEuropePack = vpnViewModel::toggleEuropeSubscriptionPack,
+                                    onCopiedMessage = vpnViewModel::showMessage
                                 )
 
                                 2 -> ProfileScreen(

@@ -15,7 +15,7 @@ class VpnRepository(private val serverDao: ServerDao) {
     suspend fun ensureSeeded() {
         withContext(Dispatchers.IO) {
             val count = serverDao.getServerCount()
-            if (count == 0 || count > 5) {
+            if (count == 0) {
                 serverDao.deleteDefaultServers()
                 serverDao.insertAll(DefaultServers.getInitialServers())
             }

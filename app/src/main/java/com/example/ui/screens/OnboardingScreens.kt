@@ -586,9 +586,9 @@ fun NoInternetSixDotsAnimation(
     modifier: Modifier = Modifier
 ) {
     val elapsedMs = rememberMonotonicMillis(resetKey = triggerKey)
-    val riseDurationMs = 780L
-    val spinDurationMs = 600L
-    val fallDurationMs = 880L
+    val riseDurationMs = 1550L
+    val spinDurationMs = 1400L
+    val fallDurationMs = 1650L
     val activeTotalMs = riseDurationMs + spinDurationMs + fallDurationMs
     val totalCycleMs = activeTotalMs + pauseBetweenCyclesMs
     val tMs = elapsedMs % totalCycleMs

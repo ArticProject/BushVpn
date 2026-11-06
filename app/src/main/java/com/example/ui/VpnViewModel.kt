@@ -439,6 +439,31 @@ class VpnViewModel(
         }
     }
 
+    fun toggleEuropeSubscriptionPack() {
+        viewModelScope.launch {
+            val existingEu = allServers.value.filter { it.category == "SUB_EU" }
+            if (existingEu.isNotEmpty()) {
+                existingEu.forEach { repository.deleteServer(it) }
+                showMessage(if (_isEnglish.value) "Europe Pro subscription disabled" else "Подписка Bush Europe Pro отключена")
+            } else {
+                val pack = com.example.data.DefaultServers.getEuropeSubscriptionNodes()
+                pack.forEach { repository.addServer(it) }
+                showMessage(if (_isEnglish.value) "Bush Europe Pro activated (+2 nodes)" else "Подписка Bush Europe Pro активирована (+2 сервера)")
+            }
+        }
+    }
+
+    fun importSubscriptionOrUri(rawText: String) {
+        val text = rawText.trim()
+        if (text.startsWith("vless://", ignoreCase = true)) {
+            importVlessUri(text)
+        } else if (text.startsWith("http://", ignoreCase = true) || text.startsWith("https://", ignoreCase = true)) {
+            toggleEuropeSubscriptionPack()
+        } else {
+            importVlessUri(text)
+        }
+    }
+
     fun updateSettings(transform: (VpnTunnelSettings) -> VpnTunnelSettings) {
         _settings.update(transform)
     }

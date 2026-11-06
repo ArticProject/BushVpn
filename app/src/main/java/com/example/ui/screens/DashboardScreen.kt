@@ -28,12 +28,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.PowerSettingsNew
 import androidx.compose.material.icons.filled.WifiOff
-import androidx.compose.material3.Button
-import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -50,9 +52,12 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.R
@@ -80,6 +85,7 @@ fun DashboardScreen(
     onOpenServerList: () -> Unit,
     onOpenAddServer: () -> Unit,
     onOpenXrayConfig: (VlessServerEntity) -> Unit,
+    onDeleteServer: (VlessServerEntity) -> Unit = {},
     onTriggerNoInternetDemo: () -> Unit
 ) {
     val colors = LocalAstralColors.current
@@ -90,7 +96,7 @@ fun DashboardScreen(
         initialValue = 1.0f,
         targetValue = 1.46f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = FastOutSlowInEasing),
+            animation = tween(2400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "ringScale1"
@@ -99,7 +105,7 @@ fun DashboardScreen(
         initialValue = 0.55f,
         targetValue = 0f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, easing = LinearEasing),
+            animation = tween(2400, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "ringAlpha1"
@@ -108,7 +114,7 @@ fun DashboardScreen(
         initialValue = 1.0f,
         targetValue = 1.72f,
         animationSpec = infiniteRepeatable(
-            animation = tween(1500, delayMillis = 380, easing = FastOutSlowInEasing),
+            animation = tween(2400, delayMillis = 600, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Restart
         ),
         label = "ringScale2"
@@ -188,7 +194,6 @@ fun DashboardScreen(
                     )
                 }
 
-                // Quick Offline Animation Button (to test the "No internet connection" screen anytime)
                 IconButton(
                     onClick = onTriggerNoInternetDemo,
                     modifier = Modifier
@@ -231,7 +236,7 @@ fun DashboardScreen(
         Box(
             modifier = Modifier
                 .fillMaxWidth()
-                .height(238.dp)
+                .height(234.dp)
                 .clip(RoundedCornerShape(28.dp))
                 .background(Color(0xFF141416))
                 .border(1.dp, colors.border, RoundedCornerShape(28.dp))
@@ -260,6 +265,26 @@ fun DashboardScreen(
                         )
                     )
             )
+
+            // Top-Left Free / Subscription Badge
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopStart)
+                    .padding(14.dp)
+                    .clip(RoundedCornerShape(50))
+                    .background(Color.Black.copy(alpha = 0.62f))
+                    .border(1.dp, Color.White.copy(alpha = 0.16f), RoundedCornerShape(50))
+                    .padding(horizontal = 12.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = if (activeNode?.isCustom == true) "SUBSCRIPTION NODE" else "FREE STANDARD",
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 10.sp,
+                    letterSpacing = 1.sp,
+                    color = Color.White
+                )
+            }
 
             // Top-Right Ping Pill "• 28ms"
             if (activeNode != null) {
@@ -308,7 +333,6 @@ fun DashboardScreen(
                     val baseR = 53.dp.toPx()
 
                     if (connectionStatus == VpnConnectionStatus.DISCONNECTED) {
-                        // Subtle breathing halo in idle state
                         drawCircle(
                             color = Color.White.copy(alpha = ringAlpha1 * 0.42f),
                             radius = baseR * (1f + (ringScale1 - 1f) * 0.55f),
@@ -316,7 +340,6 @@ fun DashboardScreen(
                             style = Stroke(width = 1.2.dp.toPx())
                         )
                     } else {
-                        // Strong sonar waves in LINKING / CONNECTED state
                         drawCircle(
                             color = Color.White.copy(alpha = ringAlpha1 * 0.65f),
                             radius = baseR * ringScale1,
@@ -376,44 +399,9 @@ fun DashboardScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(22.dp))
+        Spacer(modifier = Modifier.height(20.dp))
 
-        Text(
-            text = "NEW PROTOCOL",
-            fontFamily = SpaceGroteskFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 11.sp,
-            letterSpacing = 1.6.sp,
-            color = colors.secondaryText
-        )
-
-        Spacer(modifier = Modifier.height(6.dp))
-
-        Text(
-            text = "Everyday privacy with a sharp silhouette.",
-            fontFamily = SpaceGroteskFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 31.sp,
-            lineHeight = 36.sp,
-            letterSpacing = (-0.5).sp,
-            color = colors.primaryInk
-        )
-
-        Spacer(modifier = Modifier.height(8.dp))
-
-        val cityDisplay = activeNode?.localizedCity(isEnglish) ?: "Хельсинки"
-        Text(
-            text = "Minimal sovereign tunnel routing device traffic through $cityDisplay and global nodes.",
-            fontFamily = PlusJakartaFontFamily,
-            fontWeight = FontWeight.Medium,
-            fontSize = 14.sp,
-            lineHeight = 20.sp,
-            color = colors.secondaryText
-        )
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        // Dual Action Pill Buttons: "• Connect Tunnel" and "Inspect (HEL)"
+        // Dual Action Pill Buttons: "• Connect Tunnel" and "+ VLESS Key" (Happ / Incy style)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -450,9 +438,9 @@ fun DashboardScreen(
                     Spacer(modifier = Modifier.width(8.dp))
                     Text(
                         text = when (connectionStatus) {
-                            VpnConnectionStatus.DISCONNECTED -> "Connect Tunnel"
-                            VpnConnectionStatus.CONNECTING -> "Linking..."
-                            VpnConnectionStatus.CONNECTED -> "Disconnect"
+                            VpnConnectionStatus.DISCONNECTED -> if (isEnglish) "Connect Tunnel" else "Подключить"
+                            VpnConnectionStatus.CONNECTING -> if (isEnglish) "Linking..." else "Подключение..."
+                            VpnConnectionStatus.CONNECTED -> if (isEnglish) "Disconnect" else "Отключить"
                         },
                         fontFamily = PlusJakartaFontFamily,
                         fontWeight = FontWeight.Bold,
@@ -467,20 +455,26 @@ fun DashboardScreen(
                     .weight(1f)
                     .height(48.dp)
                     .clip(RoundedCornerShape(50))
-                    .clickable {
-                        if (activeNode != null) onOpenXrayConfig(activeNode)
-                    }
+                    .clickable(onClick = onOpenAddServer)
                     .border(1.dp, colors.border, RoundedCornerShape(50))
                     .testTag("inspect_node_pill_button"),
                 color = colors.cardElevated,
                 shape = RoundedCornerShape(50)
             ) {
-                Box(
+                Row(
                     modifier = Modifier.fillMaxSize(),
-                    contentAlignment = Alignment.Center
+                    horizontalArrangement = Arrangement.Center,
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
+                    Icon(
+                        imageVector = Icons.Default.Add,
+                        contentDescription = "Add VLESS",
+                        tint = colors.primaryInk,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = "Inspect (${activeNode?.nodeAirportCode ?: "HEL"})",
+                        text = if (isEnglish) "Import VLESS" else "Ключ vless://",
                         fontFamily = PlusJakartaFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 13.sp,
@@ -490,63 +484,62 @@ fun DashboardScreen(
             }
         }
 
-        Spacer(modifier = Modifier.height(26.dp))
+        Spacer(modifier = Modifier.height(24.dp))
 
-        // FEATURED / Selected nodes Section Header
-        Column(modifier = Modifier.fillMaxWidth()) {
+        // Tab 1 Servers List Section (Happ / Incy style: Free Standard Server + any imported subscription nodes)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.Bottom
+        ) {
+            Column {
+                Text(
+                    text = if (isEnglish) "ROUTING NODES" else "СЕРВЕРЫ ТУННЕЛЯ",
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 11.sp,
+                    letterSpacing = 1.5.sp,
+                    color = colors.secondaryText
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (isEnglish) "Available Servers" else "Доступные серверы",
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 23.sp,
+                    color = colors.primaryInk
+                )
+            }
+
             Text(
-                text = "FEATURED",
-                fontFamily = SpaceGroteskFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 11.sp,
-                letterSpacing = 1.5.sp,
-                color = colors.secondaryText
-            )
-            Spacer(modifier = Modifier.height(2.dp))
-            Text(
-                text = "Selected nodes",
-                fontFamily = SpaceGroteskFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 24.sp,
-                color = colors.primaryInk
-            )
-            Text(
-                text = "A quick edit from the full network.",
+                text = if (isEnglish) "Subscriptions →" else "Подписки →",
                 fontFamily = PlusJakartaFontFamily,
-                fontWeight = FontWeight.Normal,
+                fontWeight = FontWeight.Bold,
                 fontSize = 13.sp,
-                color = colors.secondaryText
+                color = colors.primaryInk,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .clickable(onClick = onOpenServerList)
+                    .padding(horizontal = 8.dp, vertical = 4.dp)
             )
         }
 
-        Spacer(modifier = Modifier.height(14.dp))
+        Spacer(modifier = Modifier.height(12.dp))
 
-        // 2-Column Grid of Featured City Node Cards (3 nodes: Хельсинки, Франкфурт, Варшава)
-        val rows = allServers.chunked(2)
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            rows.forEach { rowItems ->
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    rowItems.forEach { node ->
-                        FeaturedNodeGridCard(
-                            node = node,
-                            isSelected = node.id == activeNode?.id,
-                            isEnglish = isEnglish,
-                            onSelect = { onSelectServer(node) },
-                            onInspect = { onOpenXrayConfig(node) },
-                            modifier = Modifier.weight(1f)
-                        )
-                    }
-                    if (rowItems.size == 1) {
-                        Spacer(modifier = Modifier.weight(1f))
-                    }
-                }
+        Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            allServers.forEach { node ->
+                HappNodeRowCard(
+                    node = node,
+                    isSelected = node.id == activeNode?.id,
+                    isEnglish = isEnglish,
+                    onSelect = { onSelectServer(node) },
+                    onInspect = { onOpenXrayConfig(node) },
+                    onDelete = { onDeleteServer(node) }
+                )
             }
         }
 
-        Spacer(modifier = Modifier.height(24.dp))
+        Spacer(modifier = Modifier.height(28.dp))
 
         Row(
             modifier = Modifier
@@ -574,18 +567,21 @@ fun DashboardScreen(
 }
 
 @Composable
-private fun FeaturedNodeGridCard(
+private fun HappNodeRowCard(
     node: VlessServerEntity,
     isSelected: Boolean,
     isEnglish: Boolean,
     onSelect: () -> Unit,
     onInspect: () -> Unit,
-    modifier: Modifier = Modifier
+    onDelete: () -> Unit
 ) {
     val colors = LocalAstralColors.current
+    val loadColor = if (node.loadPercent < 30) colors.activeGreen else colors.warningOrange
+    val isDefaultFree = !node.isCustom
 
     Surface(
-        modifier = modifier
+        modifier = Modifier
+            .fillMaxWidth()
             .clip(RoundedCornerShape(22.dp))
             .clickable(onClick = onSelect)
             .border(
@@ -597,129 +593,114 @@ private fun FeaturedNodeGridCard(
         color = colors.card,
         shape = RoundedCornerShape(22.dp)
     ) {
-        Column(modifier = Modifier.padding(10.dp)) {
-            Box(
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Image(
+                painter = painterResource(id = node.cityImageRes),
+                contentDescription = node.city,
+                contentScale = ContentScale.Crop,
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(118.dp)
-                    .clip(RoundedCornerShape(16.dp))
+                    .size(54.dp)
+                    .clip(RoundedCornerShape(14.dp))
                     .background(Color(0xFF18181B))
-            ) {
-                Image(
-                    painter = painterResource(id = node.cityImageRes),
-                    contentDescription = node.city,
-                    contentScale = ContentScale.Crop,
-                    modifier = Modifier.fillMaxSize()
-                )
-
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.verticalGradient(
-                                listOf(
-                                    Color.Black.copy(alpha = 0.15f),
-                                    Color.Black.copy(alpha = 0.55f)
-                                )
-                            )
-                        )
-                )
-
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.White.copy(alpha = 0.88f))
-                        .clickable(onClick = onInspect)
-                        .padding(horizontal = 10.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = "Inspect",
-                        fontFamily = PlusJakartaFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 10.sp,
-                        color = Color.Black
-                    )
-                }
-
-                Box(
-                    modifier = Modifier
-                        .align(Alignment.BottomStart)
-                        .padding(8.dp)
-                        .clip(RoundedCornerShape(50))
-                        .background(Color.Black.copy(alpha = 0.72f))
-                        .padding(horizontal = 9.dp, vertical = 4.dp)
-                ) {
-                    Text(
-                        text = "${node.localizedCity(isEnglish).uppercase()} • ${node.countryCode}",
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 9.sp,
-                        letterSpacing = 0.6.sp,
-                        color = Color.White,
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
-            Spacer(modifier = Modifier.height(10.dp))
-
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 2.dp),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = node.localizedCity(isEnglish),
-                    fontFamily = SpaceGroteskFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 15.sp,
-                    color = colors.primaryInk,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                    modifier = Modifier.weight(1f)
-                )
-                Text(
-                    text = "${node.pingMs}ms",
-                    fontFamily = JetBrainsMonoFontFamily,
-                    fontWeight = FontWeight.Medium,
-                    fontSize = 11.sp,
-                    color = colors.secondaryText
-                )
-            }
-
-            Text(
-                text = node.localizedCountry(isEnglish),
-                fontFamily = PlusJakartaFontFamily,
-                fontWeight = FontWeight.Normal,
-                fontSize = 12.sp,
-                color = colors.secondaryText,
-                modifier = Modifier.padding(horizontal = 2.dp)
             )
 
-            Spacer(modifier = Modifier.height(10.dp))
+            Spacer(modifier = Modifier.width(14.dp))
 
-            Button(
-                onClick = onSelect,
-                shape = RoundedCornerShape(50),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isSelected) colors.primaryInk else colors.cardElevated,
-                    contentColor = if (isSelected) colors.onPrimaryInk else colors.primaryInk
-                ),
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(38.dp)
-            ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = "${node.localizedCountry(isEnglish)}, ${node.localizedCity(isEnglish)}",
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        color = colors.primaryInk,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(1f, fill = false)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(50))
+                            .background(if (isDefaultFree) colors.primaryInk else colors.cardElevated)
+                            .padding(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = if (isDefaultFree) "FREE" else "SUB",
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 9.sp,
+                            letterSpacing = 0.6.sp,
+                            color = if (isDefaultFree) colors.onPrimaryInk else colors.primaryInk
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
                 Text(
-                    text = if (isSelected) "Selected" else "Route Node",
-                    fontFamily = PlusJakartaFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp
+                    text = buildAnnotatedString {
+                        withStyle(
+                            SpanStyle(
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = FontWeight.Medium,
+                                color = colors.secondaryText
+                            )
+                        ) {
+                            append("${node.nodeAirportCode} • ${node.pingMs}ms • ")
+                        }
+                        withStyle(
+                            SpanStyle(
+                                fontFamily = PlusJakartaFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = loadColor
+                            )
+                        ) {
+                            append("VLESS Reality")
+                        }
+                    },
+                    fontSize = 12.sp,
+                    modifier = Modifier.clickable(onClick = onInspect)
                 )
+            }
+
+            if (node.isCustom) {
+                IconButton(
+                    onClick = onDelete,
+                    modifier = Modifier.size(32.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.DeleteOutline,
+                        contentDescription = "Delete",
+                        tint = colors.secondaryText,
+                        modifier = Modifier.size(18.dp)
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.width(6.dp))
+
+            Box(
+                modifier = Modifier
+                    .size(28.dp)
+                    .clip(CircleShape)
+                    .background(if (isSelected) colors.primaryInk else colors.cardElevated)
+                    .border(1.dp, colors.border, CircleShape),
+                contentAlignment = Alignment.Center
+            ) {
+                if (isSelected) {
+                    Icon(
+                        imageVector = Icons.Default.Check,
+                        contentDescription = "Selected",
+                        tint = colors.onPrimaryInk,
+                        modifier = Modifier.size(16.dp)
+                    )
+                }
             }
         }
     }
