@@ -24,14 +24,12 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
-import androidx.compose.material.icons.filled.Dns
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreHoriz
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
-import androidx.compose.material.icons.filled.Speed
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -65,6 +63,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.VlessParser
 import com.example.data.VlessServerEntity
+import com.example.ui.components.IncyPingGaugeIcon
 import com.example.ui.components.MonochromeFistIcon
 import com.example.ui.theme.JetBrainsMonoFontFamily
 import com.example.ui.theme.LocalAstralColors
@@ -72,14 +71,13 @@ import com.example.ui.theme.PlusJakartaFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
 
 /**
- * Tab 2: Incy-style Servers & Subscriptions Screen (matching Screenshot_20261106_131516_771a9952.jpg):
- * - Header: "Servers" on the left + 5 compact action buttons (^, ⇅, ↻, Speedometer, +) on the right
- * - Subtitle: "${servers.size} servers · ${providerCount} providers"
+ * Tab 2: Incy-style Servers & Subscriptions Screen:
+ * - Header: "Servers" on the left + compact action buttons (^, ⇅, ↻, Custom Ping Gauge, +) on the right
+ * - Subtitle: "${allServers.size} servers · ${providerCount} providers"
  * - Search bar: "Search servers..."
  * - Protocol chips: "All", "VLESS", "Shadowsocks"
- * - Expandable Provider / Subscription Card(s) with traffic bar (∞ | --- 0.48 GB / ∞),
- *   routing notes (Wi-Fi -> Авто без БС, Мобильный / LTE -> Авто + БС), Support pill,
- *   and individual VLESS · TCP · JSON server rows with live ping.
+ * - Expandable Provider / Subscription Card(s) where the default BUSH free VPN card displays "Скоро"
+ *   and each server row shows the Country in the left box instead of a generic server rack icon.
  */
 @Composable
 fun ServersScreen(
@@ -114,8 +112,8 @@ fun ServersScreen(
 
     val displayedServers = remember(servers, sortByPingAsc, selectedProtocolChip) {
         val protoFiltered = when (selectedProtocolChip) {
-            "VLESS" -> servers
-            "Shadowsocks" -> emptyList()
+            "VLESS" -> servers.filter { it.protocol.equals("VLESS", ignoreCase = true) }
+            "Shadowsocks" -> servers.filter { it.protocol.equals("Shadowsocks", ignoreCase = true) }
             else -> servers
         }
         if (sortByPingAsc) {
@@ -125,10 +123,17 @@ fun ServersScreen(
         }
     }
 
-    val freeStandardServers = displayedServers.filter { !it.isCustom }
-    val customImportedServers = displayedServers.filter { it.isCustom }
-    val providerCount = (if (allServers.any { !it.isCustom }) 1 else 0) +
-        (if (allServers.any { it.isCustom }) 1 else 0)
+    val groupedProviders = remember(displayedServers) {
+        displayedServers.groupBy { srv ->
+            if (!srv.isCustom) "BUSH" else srv.providerName.ifBlank { "CUSTOM VLESS" }
+        }
+    }
+    val providerCount = remember(allServers) {
+        allServers.map { if (!it.isCustom) "BUSH" else it.providerName.ifBlank { "CUSTOM VLESS" } }
+            .distinct()
+            .size
+            .coerceAtLeast(1)
+    }
 
     Column(
         modifier = Modifier
@@ -138,7 +143,7 @@ fun ServersScreen(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 1. Incy Top Header Row: "Servers" + 5 compact action buttons (^, ⇅, ↻, Speedometer, +)
+        // 1. Incy Top Header Row: "Servers" + compact action buttons (^, ⇅, ↻, Custom Ping Gauge, +)
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
@@ -148,12 +153,12 @@ fun ServersScreen(
                 text = "Servers",
                 fontFamily = SpaceGroteskFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 28.sp,
+                fontSize = 26.sp,
                 color = colors.primaryInk
             )
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(5.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 IncyTopActionButton(
@@ -175,17 +180,14 @@ fun ServersScreen(
                     onClick = onPingAll,
                     testTag = "incy_refresh_button"
                 )
-                IncyTopActionButton(
-                    icon = Icons.Default.Speed,
-                    contentDescription = "Ping All",
+                IncyTopPingActionButton(
                     onClick = onPingAll,
                     testTag = "ping_all_servers_button"
                 )
-                // Highlighted "+" button to add subscription or VLESS key
                 Surface(
                     modifier = Modifier
-                        .width(44.dp)
-                        .height(36.dp)
+                        .width(40.dp)
+                        .height(35.dp)
                         .clip(RoundedCornerShape(11.dp))
                         .clickable(onClick = onAddServerClick)
                         .testTag("add_vless_server_button"),
@@ -197,7 +199,7 @@ fun ServersScreen(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Add Subscription or Key",
                             tint = colors.onPrimaryInk,
-                            modifier = Modifier.size(20.dp)
+                            modifier = Modifier.size(19.dp)
                         )
                     }
                 }
@@ -208,7 +210,7 @@ fun ServersScreen(
 
         // 2. Subtitle: "1 servers · 1 providers"
         Text(
-            text = "${allServers.size} servers · ${providerCount.coerceAtLeast(1)} providers",
+            text = "${allServers.size} servers · $providerCount providers",
             fontFamily = PlusJakartaFontFamily,
             fontWeight = FontWeight.Medium,
             fontSize = 13.sp,
@@ -306,66 +308,25 @@ fun ServersScreen(
             contentPadding = PaddingValues(bottom = 110.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            if (freeStandardServers.isNotEmpty()) {
-                item {
+            groupedProviders.entries.forEach { (providerName, groupNodes) ->
+                val isDefaultBush = providerName == "BUSH"
+                item(key = providerName) {
                     IncyProviderGroupCard(
-                        providerTitle = "BUSH",
-                        lastUpdatedLabel = "1h",
+                        providerTitle = providerName,
+                        lastUpdatedLabel = if (isDefaultBush) "1h" else "now",
                         leftStatusLabel = "∞",
-                        trafficText = "1.42 GB / ∞",
-                        trafficProgress = 0.24f,
-                        infoLines = listOf(
-                            "✅  Бесплатный сервер по стандарту",
-                            "📶  Wi-Fi → Авто без БС",
-                            "📱  Мобильный / LTE → Авто + БС",
-                            "ℹ️  Ping «${freeStandardServers.first().pingMs}ms» — стабильно",
-                            "🌐  bushvpn.net"
-                        ),
-                        supportLabel = "Support",
-                        timestampText = "06.11.26, 13:15",
-                        nodes = freeStandardServers,
-                        selectedServerId = selectedServerId,
-                        pingingServerIds = pingingServerIds,
-                        isEnglish = isEnglish,
-                        forceExpanded = allExpanded,
-                        onRefreshGroup = onPingAll,
-                        onPingGroup = onPingAll,
-                        onAddKeyToGroup = onAddServerClick,
-                        onPasteFromClipboard = {
-                            val clip = clipboardManager.getText()?.text?.trim().orEmpty()
-                            if (clip.isNotEmpty()) {
-                                onImportSubscriptionText(clip)
-                            } else {
-                                onAddServerClick()
-                            }
+                        trafficText = if (isDefaultBush) "1.42 GB / ∞" else "0.18 GB / ∞",
+                        trafficProgress = if (isDefaultBush) 0.24f else 0.12f,
+                        infoLines = if (isDefaultBush) {
+                            listOf(if (isEnglish) "Soon" else "Скоро")
+                        } else {
+                            listOf(
+                                if (isEnglish) "Active subscription" else "Активная подписка"
+                            )
                         },
-                        onSelectNode = onSelectServer,
-                        onPingNode = onPingServer,
-                        onInspectNode = onOpenXrayConfig,
-                        onDeleteNode = onDeleteServerClick,
-                        onCopyNodeUri = { srv ->
-                            clipboardManager.setText(AnnotatedString(VlessParser.toUri(srv)))
-                            onCopiedMessage("VLESS URI скопирован")
-                        }
-                    )
-                }
-            }
-
-            if (customImportedServers.isNotEmpty()) {
-                item {
-                    IncyProviderGroupCard(
-                        providerTitle = "CUSTOM VLESS",
-                        lastUpdatedLabel = "now",
-                        leftStatusLabel = "∞",
-                        trafficText = "0.18 GB / ∞",
-                        trafficProgress = 0.12f,
-                        infoLines = listOf(
-                            "✅  Пользовательская подписка активна",
-                            "📶  Маршрутизация VLESS Reality / XTLS"
-                        ),
-                        supportLabel = null,
+                        supportLabel = if (isDefaultBush) "Support" else null,
                         timestampText = "06.11.26, 13:15",
-                        nodes = customImportedServers,
+                        nodes = groupNodes,
                         selectedServerId = selectedServerId,
                         pingingServerIds = pingingServerIds,
                         isEnglish = isEnglish,
@@ -431,8 +392,8 @@ internal fun IncyTopActionButton(
     val colors = LocalAstralColors.current
     Surface(
         modifier = Modifier
-            .width(42.dp)
-            .height(36.dp)
+            .width(38.dp)
+            .height(35.dp)
             .clip(RoundedCornerShape(11.dp))
             .clickable(onClick = onClick)
             .border(1.dp, colors.border, RoundedCornerShape(11.dp))
@@ -452,9 +413,35 @@ internal fun IncyTopActionButton(
                     imageVector = icon,
                     contentDescription = contentDescription,
                     tint = colors.primaryInk,
-                    modifier = Modifier.size(18.dp)
+                    modifier = Modifier.size(17.dp)
                 )
             }
+        }
+    }
+}
+
+@Composable
+internal fun IncyTopPingActionButton(
+    onClick: () -> Unit,
+    testTag: String
+) {
+    val colors = LocalAstralColors.current
+    Surface(
+        modifier = Modifier
+            .width(38.dp)
+            .height(35.dp)
+            .clip(RoundedCornerShape(11.dp))
+            .clickable(onClick = onClick)
+            .border(1.dp, colors.border, RoundedCornerShape(11.dp))
+            .testTag(testTag),
+        color = colors.card,
+        shape = RoundedCornerShape(11.dp)
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            IncyPingGaugeIcon(
+                color = colors.primaryInk,
+                size = 17.dp
+            )
         }
     }
 }
@@ -500,7 +487,7 @@ internal fun IncyProviderGroupCard(
                 .fillMaxWidth()
                 .padding(16.dp)
         ) {
-            // Card Top Row: Chevron + Title on Left | "1h" + Refresh + Speedometer + More (...) on Right
+            // Card Top Row: Chevron + Title on Left | "1h" + Refresh + Custom Ping Gauge + More (...) on Right
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -549,8 +536,7 @@ internal fun IncyProviderGroupCard(
                         contentDescription = "Refresh Subscription",
                         onClick = onRefreshGroup
                     )
-                    IncyCircleIconButton(
-                        icon = Icons.Default.Speed,
+                    IncyCirclePingButton(
                         contentDescription = "Ping Subscription Nodes",
                         onClick = onPingGroup
                     )
@@ -566,14 +552,14 @@ internal fun IncyProviderGroupCard(
                             onDismissRequest = { showMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Вставить ключ из буфера") },
+                                text = { Text("Вставить подписку / ключ из буфера") },
                                 onClick = {
                                     showMenu = false
                                     onPasteFromClipboard()
                                 }
                             )
                             DropdownMenuItem(
-                                text = { Text("Добавить сервер вручную") },
+                                text = { Text("Добавить подписку или сервер") },
                                 onClick = {
                                     showMenu = false
                                     onAddKeyToGroup()
@@ -594,6 +580,15 @@ internal fun IncyProviderGroupCard(
                                         onInspectNode(firstNode)
                                     }
                                 )
+                                if (firstNode.isCustom) {
+                                    DropdownMenuItem(
+                                        text = { Text("Удалить сервер") },
+                                        onClick = {
+                                            showMenu = false
+                                            onDeleteNode(firstNode)
+                                        }
+                                    )
+                                }
                             }
                         }
                     }
@@ -642,15 +637,16 @@ internal fun IncyProviderGroupCard(
                 Column(modifier = Modifier.fillMaxWidth()) {
                     Spacer(modifier = Modifier.height(14.dp))
 
-                    // Provider Info Lines (matching Incy screenshot)
+                    // Provider Info Lines ("Скоро" for BUSH free VPN)
                     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                         infoLines.forEach { line ->
                             Text(
                                 text = line,
                                 fontFamily = PlusJakartaFontFamily,
-                                fontSize = 13.5.sp,
-                                lineHeight = 19.sp,
-                                color = colors.secondaryText
+                                fontWeight = FontWeight.SemiBold,
+                                fontSize = 14.5.sp,
+                                lineHeight = 20.sp,
+                                color = colors.primaryInk
                             )
                         }
                     }
@@ -752,6 +748,28 @@ private fun IncyCircleIconButton(
 }
 
 @Composable
+private fun IncyCirclePingButton(
+    contentDescription: String,
+    onClick: () -> Unit
+) {
+    val colors = LocalAstralColors.current
+    Box(
+        modifier = Modifier
+            .size(34.dp)
+            .clip(CircleShape)
+            .background(colors.cardElevated)
+            .border(1.dp, colors.border, CircleShape)
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        IncyPingGaugeIcon(
+            color = colors.primaryInk,
+            size = 16.dp
+        )
+    }
+}
+
+@Composable
 private fun IncyServerNodeRow(
     server: VlessServerEntity,
     isSelected: Boolean,
@@ -779,33 +797,45 @@ private fun IncyServerNodeRow(
             .testTag("server_card_${server.countryCode}_${server.id}"),
         verticalAlignment = Alignment.CenterVertically
     ) {
-        // Left Rounded Server Box Icon (matching Incy's stacked server icon box)
+        // Left Country Box: shows Country Flag + Country Code instead of a generic server rack icon!
         Box(
             modifier = Modifier
-                .size(42.dp)
+                .size(44.dp)
                 .clip(RoundedCornerShape(12.dp))
                 .background(if (isSelected) colors.primaryInk else colors.cardElevated)
                 .border(1.dp, colors.border, RoundedCornerShape(12.dp))
                 .clickable(onClick = onInspect),
             contentAlignment = Alignment.Center
         ) {
-            Icon(
-                imageVector = Icons.Default.Dns,
-                contentDescription = "Server node",
-                tint = if (isSelected) colors.onPrimaryInk else colors.primaryInk,
-                modifier = Modifier.size(20.dp)
-            )
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.Center
+            ) {
+                Text(
+                    text = server.flagEmoji,
+                    fontSize = 18.sp,
+                    textAlign = TextAlign.Center
+                )
+                Text(
+                    text = server.countryCode.uppercase(),
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 8.5.sp,
+                    lineHeight = 9.sp,
+                    color = if (isSelected) colors.onPrimaryInk else colors.secondaryText
+                )
+            }
         }
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Center Server Title + "VLESS · TCP · JSON" subtitle
+        // Center Country Name + "VLESS · TCP · JSON" subtitle
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = "${server.flagEmoji}  ${server.localizedCountry(isEnglish)}, ${server.localizedCity(isEnglish)}",
+                text = server.localizedCountry(isEnglish),
                 fontFamily = SpaceGroteskFontFamily,
                 fontWeight = FontWeight.Bold,
-                fontSize = 15.sp,
+                fontSize = 15.5.sp,
                 color = colors.primaryInk,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis
@@ -820,7 +850,7 @@ private fun IncyServerNodeRow(
                             color = colors.primaryInk
                         )
                     ) {
-                        append("VLESS")
+                        append(server.protocol.uppercase())
                     }
                     withStyle(
                         SpanStyle(

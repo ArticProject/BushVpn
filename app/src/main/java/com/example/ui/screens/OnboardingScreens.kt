@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -510,7 +511,7 @@ fun AdvantagesScreen(
  * 60fps Motion-Captured 2D Rigid-Body Gravity & Collision Trajectory from main_9695194f.mp4.
  * Each entry has 12 floats: (x0, y0, x1, y1, x2, y2, x3, y3, x4, y4, x5, y5) normalized to R_ring = 1.0f.
  * - Frame 0: Exact 6-dot hexagon circle.
- * - Frames 1..49 (816ms at 60fps): Gravity pulls the 6 balls down onto the floor (y = +1.407).
+ * - Frames 1..49: Gravity pulls the 6 balls down onto the floor (y = +1.407).
  *   Bottom balls hit the floor and bounce; top-right ball deflects off bottom-right ball and rolls
  *   out to the right (x = +2.415); top-center and top-left balls collide and settle into the upper
  *   pockets between the floor balls while pushing the bottom-left ball outward (x = -1.267).
@@ -569,63 +570,57 @@ private val SIX_BALL_PHYSICS_FRAMES: Array<FloatArray> = arrayOf(
 )
 
 /**
- * Exact 6-Ball Gravity Collapse & Collision Animation from main_9695194f.mp4:
- * - Plays IMMEDIATELY when the window appears (and every time "Try again" is pressed):
- *   1. 0..780ms (Rise): The 6 balls rise up from the scattered floor pile into the 6-dot circle (frames 49 -> 0).
- *   2. 780..1380ms (Spin): The 6-dot circle rotates smoothly by 120°/180° trying to establish connection.
- *   3. 1380..2260ms (Gravity Collapse & Scatter): Gravity pulls all 6 balls down onto the floor (frames 0 -> 49);
- *      bottom balls hit the floor and bounce, right ball slides off and rolls to the right, and top balls
- *      collide into the upper pockets while pushing the left ball outward.
- *   4. 2260..7260ms (5000ms = 5s wait): The 6 balls lie scattered on the floor for 5 seconds before repeating.
+ * Exact 6-Ball Gravity Collapse & Collision Animation from main_9695194f.mp4.
+ * Starts IMMEDIATELY at t=0 with the 6 balls in the top circle, doing a brief 250ms spin
+ * and immediately collapsing/scattering onto the floor so there is zero waiting delay!
  */
 @Composable
 fun NoInternetSixDotsAnimation(
     dotColor: Color,
     triggerKey: Int = 0,
-    pauseBetweenCyclesMs: Long = 5000L,
+    pauseBetweenCyclesMs: Long = 3800L,
     modifier: Modifier = Modifier
 ) {
     val elapsedMs = rememberMonotonicMillis(resetKey = triggerKey)
-    val riseDurationMs = 1550L
-    val spinDurationMs = 1400L
-    val fallDurationMs = 1650L
-    val activeTotalMs = riseDurationMs + spinDurationMs + fallDurationMs
-    val totalCycleMs = activeTotalMs + pauseBetweenCyclesMs
+    val initialSpinMs = 260L
+    val fallDurationMs = 1550L
+    val riseDurationMs = 1450L
+    val loopSpinMs = 950L
+    val totalCycleMs = initialSpinMs + fallDurationMs + pauseBetweenCyclesMs + riseDurationMs + loopSpinMs
     val tMs = elapsedMs % totalCycleMs
 
     val maxIndex = (SIX_BALL_PHYSICS_FRAMES.size - 1).toFloat()
 
     // Continuous frame index in [0f .. 49f], where 0f = 6-dot circle and 49f = scattered floor pile
     val exactFramePos: Float = when {
-        tMs < riseDurationMs -> {
-            val p = easeInOutCubic(tMs.toFloat() / riseDurationMs.toFloat())
-            (1f - p) * maxIndex
-        }
-        tMs < riseDurationMs + spinDurationMs -> 0f
-        tMs < activeTotalMs -> {
-            val fallElapsed = (tMs - (riseDurationMs + spinDurationMs)).toFloat()
+        tMs < initialSpinMs -> 0f
+        tMs < initialSpinMs + fallDurationMs -> {
+            val fallElapsed = (tMs - initialSpinMs).toFloat()
             val p = (fallElapsed / fallDurationMs.toFloat()).coerceIn(0f, 1f)
             p * maxIndex
         }
-        else -> maxIndex
-    }
-
-    // Smooth spinner rotation during the Rise + Spin phase (rotates an exact multiple of 60° = PI/3
-    // so that at the end of Spin the 6 balls align seamlessly with Frame 0 of the gravity fall!)
-    val spinAngleRad: Float = when {
-        tMs < riseDurationMs -> {
-            val p = easeInOutCubic(tMs.toFloat() / riseDurationMs.toFloat())
-            // Blend rotation in as the balls approach the circle
-            p * p * (PI.toFloat() / 3f)
-        }
-        tMs < riseDurationMs + spinDurationMs -> {
-            val p = easeInOutCubic((tMs - riseDurationMs).toFloat() / spinDurationMs.toFloat())
-            (PI.toFloat() / 3f) + p * (2f * PI.toFloat() / 3f)
+        tMs < initialSpinMs + fallDurationMs + pauseBetweenCyclesMs -> maxIndex
+        tMs < initialSpinMs + fallDurationMs + pauseBetweenCyclesMs + riseDurationMs -> {
+            val riseElapsed = (tMs - (initialSpinMs + fallDurationMs + pauseBetweenCyclesMs)).toFloat()
+            val p = easeInOutCubic((riseElapsed / riseDurationMs.toFloat()).coerceIn(0f, 1f))
+            (1f - p) * maxIndex
         }
         else -> 0f
     }
 
-    // Weight of how close we are to the pure circle (1f in circle, 0f on floor) for applying spinAngleRad
+    val spinAngleRad: Float = when {
+        tMs < initialSpinMs -> {
+            val p = easeInOutCubic(tMs.toFloat() / initialSpinMs.toFloat())
+            p * (PI.toFloat() / 3f)
+        }
+        tMs >= initialSpinMs + fallDurationMs + pauseBetweenCyclesMs + riseDurationMs -> {
+            val spinElapsed = (tMs - (initialSpinMs + fallDurationMs + pauseBetweenCyclesMs + riseDurationMs)).toFloat()
+            val p = easeInOutCubic((spinElapsed / loopSpinMs.toFloat()).coerceIn(0f, 1f))
+            p * (2f * PI.toFloat() / 3f)
+        }
+        else -> 0f
+    }
+
     val circleSpinWeight: Float = (1f - (exactFramePos / 12f)).coerceIn(0f, 1f)
 
     val idx0 = exactFramePos.toInt().coerceIn(0, SIX_BALL_PHYSICS_FRAMES.lastIndex)
@@ -641,7 +636,6 @@ fun NoInternetSixDotsAnimation(
             .height(92.dp)
     ) {
         val ringRadiusPx = 19.5.dp.toPx()
-        // Exact ball-to-ring radius ratio from main_9695194f.mp4 (20.94 / 53.45 = 0.3918)
         val dotRadiusPx = ringRadiusPx * 0.388f
         val cx = size.width / 2f - ringRadiusPx * 0.20f
         val cy = size.height / 2f - ringRadiusPx * 0.22f
@@ -760,12 +754,18 @@ fun NoInternetConnectionOverlay(
 ) {
     val colors = LocalAstralColors.current
     var replayTrigger by remember { mutableIntStateOf(0) }
+    val backdropInteraction = remember { MutableInteractionSource() }
+    val contentInteraction = remember { MutableInteractionSource() }
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(colors.background.copy(alpha = 0.96f))
-            .clickable(enabled = true, onClick = onDismiss)
+            .background(colors.background)
+            .clickable(
+                interactionSource = backdropInteraction,
+                indication = null,
+                onClick = onDismiss
+            )
             .padding(28.dp)
             .testTag("no_internet_overlay"),
         contentAlignment = Alignment.Center
@@ -774,13 +774,17 @@ fun NoInternetConnectionOverlay(
             horizontalAlignment = Alignment.CenterHorizontally,
             modifier = Modifier
                 .fillMaxWidth()
-                .clickable(enabled = true, onClick = {})
+                .clickable(
+                    interactionSource = contentInteraction,
+                    indication = null,
+                    onClick = {}
+                )
                 .padding(horizontal = 16.dp)
         ) {
             NoInternetSixDotsAnimation(
                 dotColor = colors.primaryInk,
                 triggerKey = replayTrigger,
-                pauseBetweenCyclesMs = 5000L
+                pauseBetweenCyclesMs = 3800L
             )
 
             Spacer(modifier = Modifier.height(14.dp))

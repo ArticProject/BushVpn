@@ -87,10 +87,11 @@ class MainActivity : ComponentActivity() {
 
         val database = AppDatabase.getDatabase(applicationContext)
         val repository = VpnRepository(database.serverDao())
+        val prefs = applicationContext.getSharedPreferences("bush_vpn_prefs", Context.MODE_PRIVATE)
 
         setContent {
             val vpnViewModel: VpnViewModel = viewModel(
-                factory = VpnViewModel.Factory(repository)
+                factory = VpnViewModel.Factory(repository, prefs)
             )
             val isDarkTheme by vpnViewModel.isDarkTheme.collectAsStateWithLifecycle()
 
@@ -139,6 +140,7 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
     val isPingingAll by vpnViewModel.isPingingAll.collectAsStateWithLifecycle()
     val pingingServerIds by vpnViewModel.pingingServerIds.collectAsStateWithLifecycle()
     val settings by vpnViewModel.settings.collectAsStateWithLifecycle()
+    val coreLogs by vpnViewModel.coreLogs.collectAsStateWithLifecycle()
     val snackbarMessage by vpnViewModel.snackbarMessage.collectAsStateWithLifecycle()
 
     var currentTab by rememberSaveable { mutableIntStateOf(0) }
@@ -281,6 +283,10 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
                                     isDarkTheme = isDarkTheme,
                                     isPingingAll = isPingingAll,
                                     pingingServerIds = pingingServerIds,
+                                    settings = settings,
+                                    coreLogs = coreLogs,
+                                    onUpdateSettings = vpnViewModel::updateSettings,
+                                    onClearLogs = vpnViewModel::clearLogs,
                                     onToggleLanguage = vpnViewModel::toggleLanguage,
                                     onToggleTheme = vpnViewModel::toggleTheme,
                                     onToggleConnection = handleToggleConnection,
@@ -296,6 +302,7 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
                                     onImportSubscriptionText = vpnViewModel::importSubscriptionOrUri,
                                     onCopiedMessage = vpnViewModel::showMessage,
                                     onDeleteServer = vpnViewModel::deleteServer,
+                                    onReplayOnboarding = vpnViewModel::replayOnboarding,
                                     onTriggerNoInternetDemo = { isManualOfflinePreview = true }
                                 )
 

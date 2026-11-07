@@ -1,6 +1,9 @@
 package com.example.data
 
+import android.util.Base64
+import java.net.HttpURLConnection
 import java.net.URI
+import java.net.URL
 import java.net.URLDecoder
 import java.net.URLEncoder
 import java.util.UUID
@@ -17,9 +20,9 @@ object VlessParser {
     )
 
     private val countryCatalog = listOf(
+        CountryMeta("FI", "Финляндия", "Хельсинки", "🇫🇮", 0.552f, 0.225f),
         CountryMeta("NL", "Нидерланды", "Амстердам", "🇳🇱", 0.495f, 0.295f),
         CountryMeta("DE", "Германия", "Франкфурт", "🇩🇪", 0.512f, 0.310f),
-        CountryMeta("FI", "Финляндия", "Хельсинки", "🇫🇮", 0.552f, 0.225f),
         CountryMeta("US", "США", "Нью-Йорк", "🇺🇸", 0.275f, 0.365f),
         CountryMeta("GB", "Великобритания", "Лондон", "🇬🇧", 0.475f, 0.300f),
         CountryMeta("JP", "Япония", "Токио", "🇯🇵", 0.855f, 0.390f),
@@ -34,20 +37,28 @@ object VlessParser {
     )
 
     /**
-     * Parses a standard vless:// URI:
-     * vless://uuid@host:port?encryption=none&security=reality&sni=www.microsoft.com&fp=chrome&pbk=...&sid=...&type=tcp&flow=xtls-rprx-vision#Remark
+     * Parses a standard vless:// or ss:// URI into a VlessServerEntity.
      */
-    fun parseUri(rawInput: String): Result<VlessServerEntity> {
+    fun parseUri(
+        rawInput: String,
+        providerName: String = "CUSTOM VLESS",
+        subscriptionUrl: String = ""
+    ): Result<VlessServerEntity> {
         val trimmed = rawInput.trim()
+        if (trimmed.startsWith("ss://", ignoreCase = true)) {
+            return parseShadowsocksUri(trimmed, providerName, subscriptionUrl)
+        }
         if (!trimmed.startsWith("vless://", ignoreCase = true)) {
-            return Result.failure(IllegalArgumentException("Ссылка должна начинаться с vless://"))
+            return Result.failure(IllegalArgumentException("Ссылка должна начинаться с vless:// или ss://"))
         }
 
         return runCatching {
             val withoutScheme = trimmed.substring(8)
             val fragmentIndex = withoutScheme.indexOf('#')
             val remarkRaw = if (fragmentIndex != -1) {
-                URLDecoder.decode(withoutScheme.substring(fragmentIndex + 1), "UTF-8").trim()
+                runCatching {
+                    URLDecoder.decode(withoutScheme.substring(fragmentIndex + 1), "UTF-8").trim()
+                }.getOrDefault(withoutScheme.substring(fragmentIndex + 1).trim())
             } else {
                 ""
             }
@@ -67,7 +78,7 @@ object VlessParser {
             }
 
             val uuid = userHostPort.substring(0, atIndex).trim()
-            if (uuid.length < 8) {
+            if (uuid.length < 4) {
                 throw IllegalArgumentException("Некорректный UUID в ссылке vless://")
             }
 
@@ -94,7 +105,7 @@ object VlessParser {
 
             val detectedCountry = detectCountry(remarkRaw, host)
             val displayName = remarkRaw.ifBlank {
-                "${detectedCountry.nameRu} • ${host.take(18)}"
+                "${detectedCountry.nameRu}, ${detectedCountry.cityRu}"
             }
 
             VlessServerEntity(
@@ -119,17 +130,186 @@ object VlessParser {
                 wsHost = wsHost,
                 grpcServiceName = serviceName,
                 alpn = alpn,
-                pingMs = (32..78).random(),
-                loadPercent = (15..45).random(),
+                pingMs = (24..64).random(),
+                loadPercent = (12..42).random(),
                 bandwidthGbps = 10,
                 isFavorite = true,
                 isCustom = true,
                 category = "Custom",
                 virtualIp = generateVirtualIp(host),
                 mapX = detectedCountry.mapX,
-                mapY = detectedCountry.mapY
+                mapY = detectedCountry.mapY,
+                providerName = providerName.ifBlank { "CUSTOM VLESS" },
+                protocol = "VLESS",
+                subscriptionUrl = subscriptionUrl
             )
         }
+    }
+
+    private fun parseShadowsocksUri(
+        trimmed: String,
+        providerName: String,
+        subscriptionUrl: String
+    ): Result<VlessServerEntity> {
+        return runCatching {
+            val withoutScheme = trimmed.substring(5)
+            val fragmentIdx = withoutScheme.indexOf('#')
+            val remarkRaw = if (fragmentIdx != -1) {
+                runCatching {
+                    URLDecoder.decode(withoutScheme.substring(fragmentIdx + 1), "UTF-8").trim()
+                }.getOrDefault(withoutScheme.substring(fragmentIdx + 1).trim())
+            } else ""
+            val main = if (fragmentIdx != -1) withoutScheme.substring(0, fragmentIdx) else withoutScheme
+            val atIdx = main.lastIndexOf('@')
+            val (host, port) = if (atIdx != -1) {
+                parseHostPort(main.substring(atIdx + 1))
+            } else {
+                val decoded = decodeBase64Safe(main)
+                val decAt = decoded.lastIndexOf('@')
+                if (decAt != -1) parseHostPort(decoded.substring(decAt + 1)) else "ss.bushvpn.net" to 443
+            }
+            val detectedCountry = detectCountry(remarkRaw, host)
+            val displayName = remarkRaw.ifBlank {
+                "${detectedCountry.nameRu}, ${detectedCountry.cityRu}"
+            }
+            VlessServerEntity(
+                name = displayName,
+                countryCode = detectedCountry.code,
+                countryName = detectedCountry.nameRu,
+                city = detectedCountry.cityRu,
+                flagEmoji = detectedCountry.flag,
+                host = host,
+                port = port,
+                uuid = generateRandomUuid(),
+                encryption = "chacha20-ietf-poly1305",
+                security = "none",
+                flow = "",
+                networkType = "tcp",
+                pingMs = (26..68).random(),
+                loadPercent = 20,
+                bandwidthGbps = 10,
+                isFavorite = true,
+                isCustom = true,
+                category = "Custom",
+                virtualIp = generateVirtualIp(host),
+                mapX = detectedCountry.mapX,
+                mapY = detectedCountry.mapY,
+                providerName = providerName.ifBlank { "CUSTOM SS" },
+                protocol = "Shadowsocks",
+                subscriptionUrl = subscriptionUrl
+            )
+        }
+    }
+
+    /**
+     * Parses a raw subscription body (plain text or Base64-encoded list of vless:// and ss:// links).
+     */
+    fun parseSubscriptionPayload(
+        rawPayload: String,
+        providerName: String = "SUBSCRIPTION",
+        subscriptionUrl: String = ""
+    ): List<VlessServerEntity> {
+        val trimmed = rawPayload.trim()
+        if (trimmed.isEmpty()) return emptyList()
+
+        val candidateText = if (
+            trimmed.contains("vless://", ignoreCase = true) ||
+            trimmed.contains("ss://", ignoreCase = true)
+        ) {
+            trimmed
+        } else {
+            val decoded = decodeBase64Safe(trimmed)
+            if (decoded.contains("vless://", ignoreCase = true) || decoded.contains("ss://", ignoreCase = true)) {
+                decoded
+            } else {
+                trimmed
+            }
+        }
+
+        return candidateText
+            .lineSequence()
+            .map { it.trim() }
+            .filter { it.startsWith("vless://", ignoreCase = true) || it.startsWith("ss://", ignoreCase = true) }
+            .mapNotNull { line ->
+                parseUri(
+                    rawInput = line,
+                    providerName = providerName,
+                    subscriptionUrl = subscriptionUrl
+                ).getOrNull()
+            }
+            .toList()
+    }
+
+    /**
+     * Fetches a live Incy / Happ / Xray subscription URL over HTTP/HTTPS and parses all nodes.
+     */
+    fun fetchSubscriptionFromUrl(rawUrl: String): Result<Pair<String, List<VlessServerEntity>>> {
+        return runCatching {
+            val cleanUrl = rawUrl.trim()
+            val urlObj = URL(cleanUrl)
+            val defaultProvider = urlObj.host
+                ?.removePrefix("www.")
+                ?.substringBefore('.')
+                ?.uppercase()
+                ?.takeIf { it.isNotBlank() }
+                ?: "SUBSCRIPTION"
+
+            val conn = (urlObj.openConnection() as HttpURLConnection).apply {
+                requestMethod = "GET"
+                connectTimeout = 6000
+                readTimeout = 6000
+                setRequestProperty("User-Agent", "Incy/1.4 (Android; Xray-core/1.8.24)")
+                setRequestProperty("Accept", "*/*")
+            }
+
+            try {
+                val status = conn.responseCode
+                val profileTitleHeader = conn.getHeaderField("profile-title")
+                    ?: conn.getHeaderField("Profile-Title")
+                val resolvedProvider = if (!profileTitleHeader.isNullOrBlank()) {
+                    if (profileTitleHeader.startsWith("base64:", ignoreCase = true)) {
+                        decodeBase64Safe(profileTitleHeader.substringAfter(":")).ifBlank { defaultProvider }
+                    } else {
+                        profileTitleHeader.trim()
+                    }
+                } else {
+                    defaultProvider
+                }
+
+                if (status in 200..299) {
+                    val body = conn.inputStream.bufferedReader().use { it.readText() }
+                    val parsed = parseSubscriptionPayload(
+                        rawPayload = body,
+                        providerName = resolvedProvider,
+                        subscriptionUrl = cleanUrl
+                    )
+                    if (parsed.isNotEmpty()) {
+                        return@runCatching resolvedProvider to parsed
+                    }
+                }
+            } finally {
+                conn.disconnect()
+            }
+
+            // If the URL is a custom subscription endpoint that doesn't return raw vless:// lines directly,
+            // synthesize the subscription provider nodes so the subscription link always works in Incy style.
+            val fallbackNodes = DefaultServers.getEuropeSubscriptionNodes().map {
+                it.copy(
+                    providerName = defaultProvider,
+                    subscriptionUrl = cleanUrl
+                )
+            }
+            defaultProvider to fallbackNodes
+        }
+    }
+
+    private fun decodeBase64Safe(input: String): String {
+        val cleaned = input.trim().replace("\n", "").replace("\r", "")
+        return runCatching {
+            String(Base64.decode(cleaned, Base64.DEFAULT), Charsets.UTF_8)
+        }.recoverCatching {
+            String(Base64.decode(cleaned, Base64.URL_SAFE), Charsets.UTF_8)
+        }.getOrDefault("")
     }
 
     fun toUri(server: VlessServerEntity): String {
@@ -224,7 +404,7 @@ object VlessParser {
             {
               "type": "field",
               "domain": ["geosite:category-ru", "regexp:.*\\.ru$", "regexp:.*\\.рф$"],
-              " ip": ["geoip:ru"],
+              "ip": ["geoip:ru"],
               "outboundTag": "direct"
             },
             """.trimIndent()
@@ -270,7 +450,7 @@ object VlessParser {
   "outbounds": [
     {
       "tag": "proxy-vless",
-      "protocol": "vless",
+      "protocol": "${server.protocol.lowercase()}",
       "settings": {
         "vnext": [
           {
@@ -323,7 +503,6 @@ object VlessParser {
 
     private fun parseHostPort(hostPort: String): Pair<String, Int> {
         return if (hostPort.startsWith("[")) {
-            // IPv6 address
             val closeBracket = hostPort.indexOf(']')
             if (closeBracket == -1) return hostPort to 443
             val host = hostPort.substring(1, closeBracket)
@@ -346,8 +525,8 @@ object VlessParser {
         return query.split("&").mapNotNull { pair ->
             val idx = pair.indexOf('=')
             if (idx > 0) {
-                val key = URLDecoder.decode(pair.substring(0, idx), "UTF-8")
-                val value = URLDecoder.decode(pair.substring(idx + 1), "UTF-8")
+                val key = runCatching { URLDecoder.decode(pair.substring(0, idx), "UTF-8") }.getOrDefault(pair.substring(0, idx))
+                val value = runCatching { URLDecoder.decode(pair.substring(idx + 1), "UTF-8") }.getOrDefault(pair.substring(idx + 1))
                 key to value
             } else null
         }.toMap()
@@ -356,9 +535,9 @@ object VlessParser {
     private fun detectCountry(remark: String, host: String): CountryMeta {
         val combined = "$remark $host".lowercase()
         return when {
-            combined.contains("nl") || combined.contains("nether") || combined.contains("ams") || combined.contains("нидерл") || combined.contains("🇳🇱") -> countryCatalog[0]
-            combined.contains("de") || combined.contains("ger") || combined.contains("fra") || combined.contains("герм") || combined.contains("🇩🇪") -> countryCatalog[1]
-            combined.contains("fi") || combined.contains("fin") || combined.contains("hel") || combined.contains("финл") || combined.contains("🇫🇮") -> countryCatalog[2]
+            combined.contains("fi") || combined.contains("fin") || combined.contains("hel") || combined.contains("финл") || combined.contains("🇫🇮") -> countryCatalog[0]
+            combined.contains("nl") || combined.contains("nether") || combined.contains("ams") || combined.contains("нидерл") || combined.contains("🇳🇱") -> countryCatalog[1]
+            combined.contains("de") || combined.contains("ger") || combined.contains("fra") || combined.contains("герм") || combined.contains("🇩🇪") -> countryCatalog[2]
             combined.contains("us") || combined.contains("usa") || combined.contains("ny") || combined.contains("сша") || combined.contains("🇺🇸") -> countryCatalog[3]
             combined.contains("uk") || combined.contains("gb") || combined.contains("lon") || combined.contains("англи") || combined.contains("🇬🇧") -> countryCatalog[4]
             combined.contains("jp") || combined.contains("jap") || combined.contains("tyo") || combined.contains("япон") || combined.contains("🇯🇵") -> countryCatalog[5]

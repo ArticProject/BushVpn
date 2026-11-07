@@ -2,6 +2,7 @@ package com.example.ui
 
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.net.Uri
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
@@ -56,31 +57,35 @@ data class CoreLogEntry(
 )
 
 class VpnViewModel(
-    private val repository: VpnRepository
+    private val repository: VpnRepository,
+    private val prefs: SharedPreferences? = null
 ) : ViewModel() {
 
     val allServers: StateFlow<List<VlessServerEntity>> = repository.allServers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    private val _appStage = MutableStateFlow(AppStage.WELCOME)
+    // Launch directly into MAIN_ENCLAVE so re-entering the app never replays the Welcome/Advantages animation
+    private val _appStage = MutableStateFlow(AppStage.MAIN_ENCLAVE)
     val appStage: StateFlow<AppStage> = _appStage.asStateFlow()
 
-    private val _isDarkTheme = MutableStateFlow(false)
+    private val _isDarkTheme = MutableStateFlow(prefs?.getBoolean("is_dark_theme", false) ?: false)
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
 
-    private val _isEnglish = MutableStateFlow(false)
+    private val _isEnglish = MutableStateFlow(prefs?.getBoolean("is_english", false) ?: false)
     val isEnglish: StateFlow<Boolean> = _isEnglish.asStateFlow()
 
-    private val _operatorName = MutableStateFlow("user")
+    private val _operatorName = MutableStateFlow(prefs?.getString("operator_name", "user") ?: "user")
     val operatorName: StateFlow<String> = _operatorName.asStateFlow()
 
     private val _operatorUid = MutableStateFlow("#9E29A")
     val operatorUid: StateFlow<String> = _operatorUid.asStateFlow()
 
-    private val _avatarFilePath = MutableStateFlow<String?>(null)
+    private val _avatarFilePath = MutableStateFlow<String?>(prefs?.getString("avatar_file_path", null))
     val avatarFilePath: StateFlow<String?> = _avatarFilePath.asStateFlow()
 
-    private val _selectedServerId = MutableStateFlow<Long?>(null)
+    private val _selectedServerId = MutableStateFlow<Long?>(
+        prefs?.getLong("selected_server_id", -1L)?.takeIf { it > 0L }
+    )
     val selectedServerId: StateFlow<Long?> = _selectedServerId.asStateFlow()
 
     private val _connectionStatus = MutableStateFlow(VpnConnectionStatus.DISCONNECTED)
@@ -112,7 +117,7 @@ class VpnViewModel(
     private val _searchQuery = MutableStateFlow("")
     val searchQuery: StateFlow<String> = _searchQuery.asStateFlow()
 
-    private val _selectedFilter = MutableStateFlow("ALL") // ALL, FAVORITES, P2P, STREAMING, REALITY
+    private val _selectedFilter = MutableStateFlow("ALL")
     val selectedFilter: StateFlow<String> = _selectedFilter.asStateFlow()
 
     private val _selectedCountryCode = MutableStateFlow("ALL")
@@ -155,6 +160,7 @@ class VpnViewModel(
                 srv.nodeAirportCode.contains(query, ignoreCase = true) ||
                 srv.countryCode.contains(query, ignoreCase = true) ||
                 srv.host.contains(query, ignoreCase = true) ||
+                srv.providerName.contains(query, ignoreCase = true) ||
                 srv.localizedCity(true).contains(query, ignoreCase = true) ||
                 srv.localizedCountry(true).contains(query, ignoreCase = true)
 
@@ -179,7 +185,7 @@ class VpnViewModel(
     init {
         viewModelScope.launch {
             repository.ensureSeeded()
-            appendLog("INFO", "BUSH VPN 👊 Sovereign X-Ray Core 1.8.24 initialized (VLESS REALITY)")
+            appendLog("INFO", "BUSH VPN Sovereign X-Ray Core 1.8.24 initialized (VLESS REALITY)")
         }
     }
 
@@ -195,6 +201,7 @@ class VpnViewModel(
         viewModelScope.launch {
             _appStage.value = AppStage.CONNECTING_TRANSITION
             delay(1850)
+            prefs?.edit()?.putBoolean("onboarding_completed", true)?.apply()
             _appStage.value = AppStage.MAIN_ENCLAVE
         }
     }
@@ -204,20 +211,26 @@ class VpnViewModel(
     }
 
     fun toggleTheme() {
-        _isDarkTheme.update { !it }
+        val next = !_isDarkTheme.value
+        _isDarkTheme.value = next
+        prefs?.edit()?.putBoolean("is_dark_theme", next)?.apply()
     }
 
     fun setDarkTheme(dark: Boolean) {
         _isDarkTheme.value = dark
+        prefs?.edit()?.putBoolean("is_dark_theme", dark)?.apply()
     }
 
     fun toggleLanguage() {
-        _isEnglish.update { !it }
+        val next = !_isEnglish.value
+        _isEnglish.value = next
+        prefs?.edit()?.putBoolean("is_english", next)?.apply()
     }
 
     fun updateOperatorName(newName: String) {
         val cleaned = newName.trim().ifBlank { "user" }
         _operatorName.value = cleaned
+        prefs?.edit()?.putString("operator_name", cleaned)?.apply()
         showMessage(if (_isEnglish.value) "Operator name updated: $cleaned" else "Имя оператора сохранено: $cleaned")
     }
 
@@ -232,6 +245,7 @@ class VpnViewModel(
                 }
                 withContext(Dispatchers.Main) {
                     _avatarFilePath.value = destFile.absolutePath
+                    prefs?.edit()?.putString("avatar_file_path", destFile.absolutePath)?.apply()
                     showMessage(if (_isEnglish.value) "Operator avatar updated" else "Аватар оператора обновлен")
                 }
             }
@@ -241,6 +255,7 @@ class VpnViewModel(
     fun selectServer(server: VlessServerEntity, context: Context? = null) {
         val wasConnected = _connectionStatus.value == VpnConnectionStatus.CONNECTED
         _selectedServerId.value = server.id
+        prefs?.edit()?.putLong("selected_server_id", server.id)?.apply()
         appendLog(
             "INFO",
             "Selected node ${server.nodeAirportCode} • ${server.city} (${server.host}:${server.port})"
@@ -281,10 +296,10 @@ class VpnViewModel(
         telemetryJob = viewModelScope.launch {
             _handshakeStep.value = "LINKING • ${server.nodeAirportCode}"
             appendLog("REALITY", "Linking VLESS REALITY [${server.sni} • fp=${server.fingerprint}]")
-            delay(650)
+            delay(550)
 
             startSystemVpnService(context, server)
-            delay(550)
+            delay(450)
 
             _connectionStatus.value = VpnConnectionStatus.CONNECTED
             _handshakeStep.value = "ACTIVE • ${server.virtualIp}"
@@ -400,34 +415,25 @@ class VpnViewModel(
             _isPingingAll.value = false
             val fastest = allServers.value.minByOrNull { it.pingMs }
             if (fastest != null) {
-                showMessage("${fastest.nodeAirportCode} • ${fastest.city}: ${fastest.pingMs}ms")
+                showMessage("${fastest.flagEmoji} ${fastest.localizedCountry(_isEnglish.value)}: ${fastest.pingMs}ms")
             }
         }
     }
 
     fun importVlessUri(uriText: String, onSuccess: () -> Unit = {}) {
-        val result = VlessParser.parseUri(uriText)
-        result.onSuccess { parsedServer ->
-            viewModelScope.launch {
-                val newId = repository.addServer(parsedServer)
-                _selectedServerId.value = newId
-                showMessage("VLESS: ${parsedServer.name} imported")
-                onSuccess()
-            }
-        }.onFailure { err ->
-            showMessage(err.message ?: "Invalid vless:// URI")
-        }
+        importSubscriptionOrUri(uriText, onSuccess)
     }
 
     fun saveCustomServer(server: VlessServerEntity, isEdit: Boolean) {
         viewModelScope.launch {
             if (isEdit && server.id != 0L) {
                 repository.updateServer(server)
-                showMessage("Updated ${server.name}")
+                showMessage("Обновлён: ${server.name}")
             } else {
                 val id = repository.addServer(server)
                 _selectedServerId.value = id
-                showMessage("Added ${server.name}")
+                prefs?.edit()?.putLong("selected_server_id", id)?.apply()
+                showMessage("Добавлен: ${server.name}")
             }
         }
     }
@@ -435,7 +441,7 @@ class VpnViewModel(
     fun deleteServer(server: VlessServerEntity) {
         viewModelScope.launch {
             repository.deleteServer(server)
-            showMessage("Deleted ${server.name}")
+            showMessage("Удалён: ${server.name}")
         }
     }
 
@@ -444,23 +450,80 @@ class VpnViewModel(
             val existingEu = allServers.value.filter { it.category == "SUB_EU" }
             if (existingEu.isNotEmpty()) {
                 existingEu.forEach { repository.deleteServer(it) }
-                showMessage(if (_isEnglish.value) "Europe Pro subscription disabled" else "Подписка Bush Europe Pro отключена")
+                showMessage(if (_isEnglish.value) "Subscription removed" else "Подписка удалена")
             } else {
                 val pack = com.example.data.DefaultServers.getEuropeSubscriptionNodes()
                 pack.forEach { repository.addServer(it) }
-                showMessage(if (_isEnglish.value) "Bush Europe Pro activated (+2 nodes)" else "Подписка Bush Europe Pro активирована (+2 сервера)")
+                showMessage(if (_isEnglish.value) "Subscription added (+2 servers)" else "Подписка добавлена (+2 сервера)")
             }
         }
     }
 
-    fun importSubscriptionOrUri(rawText: String) {
+    fun importSubscriptionOrUri(rawText: String, onSuccess: () -> Unit = {}) {
         val text = rawText.trim()
-        if (text.startsWith("vless://", ignoreCase = true)) {
-            importVlessUri(text)
-        } else if (text.startsWith("http://", ignoreCase = true) || text.startsWith("https://", ignoreCase = true)) {
-            toggleEuropeSubscriptionPack()
-        } else {
-            importVlessUri(text)
+        if (text.isBlank()) return
+
+        if (text.startsWith("http://", ignoreCase = true) || text.startsWith("https://", ignoreCase = true)) {
+            viewModelScope.launch {
+                showMessage(if (_isEnglish.value) "Loading subscription..." else "Загрузка подписки...")
+                val result = withContext(Dispatchers.IO) {
+                    VlessParser.fetchSubscriptionFromUrl(text)
+                }
+                result.onSuccess { (provider, nodes) ->
+                    var firstId: Long? = null
+                    nodes.forEach { node ->
+                        val id = repository.addServer(node)
+                        if (firstId == null) firstId = id
+                    }
+                    if (firstId != null) {
+                        _selectedServerId.value = firstId
+                        prefs?.edit()?.putLong("selected_server_id", firstId!!)?.apply()
+                    }
+                    showMessage(
+                        if (_isEnglish.value) "Subscription $provider added (${nodes.size} servers)"
+                        else "Подписка $provider добавлена (${nodes.size} серв.)"
+                    )
+                    onSuccess()
+                }.onFailure { err ->
+                    showMessage(err.message ?: "Ошибка загрузки подписки")
+                }
+            }
+            return
+        }
+
+        // Check if multi-line or Base64 subscription payload
+        val multiNodes = VlessParser.parseSubscriptionPayload(text, providerName = "CUSTOM VLESS")
+        if (multiNodes.isNotEmpty()) {
+            viewModelScope.launch {
+                var lastId = 0L
+                multiNodes.forEach { node ->
+                    lastId = repository.addServer(node)
+                }
+                if (lastId > 0L) {
+                    _selectedServerId.value = lastId
+                    prefs?.edit()?.putLong("selected_server_id", lastId)?.apply()
+                }
+                showMessage(
+                    if (_isEnglish.value) "Imported ${multiNodes.size} server(s)"
+                    else "Добавлено серверов: ${multiNodes.size}"
+                )
+                onSuccess()
+            }
+            return
+        }
+
+        // Fallback single URI parse
+        val singleResult = VlessParser.parseUri(text)
+        singleResult.onSuccess { parsedServer ->
+            viewModelScope.launch {
+                val newId = repository.addServer(parsedServer)
+                _selectedServerId.value = newId
+                prefs?.edit()?.putLong("selected_server_id", newId)?.apply()
+                showMessage("Добавлен: ${parsedServer.localizedCountry(_isEnglish.value)}")
+                onSuccess()
+            }
+        }.onFailure { err ->
+            showMessage(err.message ?: "Некорректная ссылка vless:// или подписка")
         }
     }
 
@@ -493,10 +556,13 @@ class VpnViewModel(
         }
     }
 
-    class Factory(private val repository: VpnRepository) : ViewModelProvider.Factory {
+    class Factory(
+        private val repository: VpnRepository,
+        private val prefs: SharedPreferences? = null
+    ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return VpnViewModel(repository) as T
+            return VpnViewModel(repository, prefs) as T
         }
     }
 }

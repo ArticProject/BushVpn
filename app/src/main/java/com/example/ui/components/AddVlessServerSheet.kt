@@ -151,14 +151,14 @@ fun AddOrEditVlessDialog(
                 ) {
                     Column {
                         Text(
-                            text = if (isEdit) "Edit Sovereign Node" else "Add VLESS Enclave",
+                            text = if (isEdit) "Редактировать узел" else "Добавить подписку или ключ",
                             fontFamily = SpaceGroteskFontFamily,
                             fontWeight = FontWeight.Bold,
                             fontSize = 20.sp,
                             color = colors.primaryInk
                         )
                         Text(
-                            text = "VLESS REALITY • XTLS-Vision • WS / gRPC",
+                            text = "Подписка https:// • vless:// • ss:// (Формат Incy)",
                             fontFamily = PlusJakartaFontFamily,
                             fontSize = 12.sp,
                             color = colors.secondaryText
@@ -188,8 +188,8 @@ fun AddOrEditVlessDialog(
                         horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         val tabs = listOf(
-                            "vless:// URI" to Icons.Default.Link,
-                            "Manual Setup" to Icons.Default.Tune
+                            "Подписка / Ключ" to Icons.Default.Link,
+                            "Вручную" to Icons.Default.Tune
                         )
                         tabs.forEachIndexed { index, (title, icon) ->
                             val selected = activeTab == index
@@ -232,7 +232,7 @@ fun AddOrEditVlessDialog(
                             .verticalScroll(rememberScrollState())
                     ) {
                         Text(
-                            text = "Paste your vless://uuid@host:port?... access key",
+                            text = "Вставьте ссылку подписки (https://...) или ключ vless:// / ss://",
                             fontFamily = PlusJakartaFontFamily,
                             fontSize = 13.sp,
                             color = colors.secondaryText
@@ -244,7 +244,7 @@ fun AddOrEditVlessDialog(
                             onValueChange = { uriInput = it },
                             placeholder = {
                                 Text(
-                                    "vless://7f2c1b09-44a8-4d91-b362-8e4a19f05c77@fi-hel-01.bushvpn.net:443?encryption=none&security=reality&sni=www.apple.com&fp=chrome&pbk=...&type=tcp&flow=xtls-rprx-vision#HEL-Finland",
+                                    "https://sub.domain.com/api/v1/client/subscribe?token=...\nили vless://uuid@host:443?security=reality...",
                                     fontFamily = JetBrainsMonoFontFamily,
                                     fontSize = 11.sp,
                                     color = colors.mutedText

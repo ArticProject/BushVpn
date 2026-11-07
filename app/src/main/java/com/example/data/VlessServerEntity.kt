@@ -36,7 +36,10 @@ data class VlessServerEntity(
     val category: String = "P2P", // P2P, STREAMING, Core, Custom
     val virtualIp: String = "95.216.140.18",
     val mapX: Float = 0.552f,
-    val mapY: Float = 0.225f
+    val mapY: Float = 0.225f,
+    val providerName: String = "BUSH",
+    val protocol: String = "VLESS", // VLESS, Shadowsocks
+    val subscriptionUrl: String = ""
 ) {
     val nodeAirportCode: String
         get() = when (countryCode.uppercase()) {
@@ -77,6 +80,9 @@ data class VlessServerEntity(
             "KZ" -> "Almaty"
             "SG" -> "Singapore"
             "JP" -> "Tokyo"
+            "SE" -> "Stockholm"
+            "FR" -> "Paris"
+            "AE" -> "Dubai"
             else -> city
         }
     }
@@ -95,13 +101,16 @@ data class VlessServerEntity(
             "KZ" -> "Kazakhstan"
             "SG" -> "Singapore"
             "JP" -> "Japan"
+            "SE" -> "Sweden"
+            "FR" -> "France"
+            "AE" -> "UAE"
             else -> countryName
         }
     }
 
     val protocolBadge: String
         get() = buildString {
-            append("VLESS")
+            append(protocol.uppercase())
             if (security.equals("reality", ignoreCase = true)) {
                 append(" Reality")
             } else if (security.equals("tls", ignoreCase = true)) {
@@ -122,6 +131,23 @@ data class VpnTunnelSettings(
     val mtu: Int = 1400,
     val enableIpv6: Boolean = false,
     val enableMux: Boolean = false,
+    val muxConcurrency: Int = 8,
+    val enableFragment: Boolean = true,
+    val fragmentPackets: String = "tlshello",
+    val fragmentLength: String = "10-30",
+    val fragmentInterval: String = "10-20",
+    val enableSniffing: Boolean = true,
+    val enableFakeDns: Boolean = false,
+    val pingType: String = "TCP", // TCP, Proxy (HEAD), ICMP
+    val pingUrl: String = "https://cp.cloudflare.com/generate_204",
+    val autoUpdateSubs: Boolean = true,
+    val updateIntervalHours: Int = 1,
+    val updateOnOpen: Boolean = true,
+    val pingOnOpen: Boolean = true,
+    val collapseSubsByDefault: Boolean = false,
+    val subscriptionUserAgent: String = "Happ/1.4 (Android; Xray-core)",
+    val perAppProxyMode: String = "Все приложения",
+    val showSpeedNotification: Boolean = true,
     val bypassLan: Boolean = true,
     val bypassRuDomains: Boolean = false,
     val blockAdsAndTrackers: Boolean = true,
@@ -132,15 +158,15 @@ data class VpnTunnelSettings(
 
 enum class RoutingMode(val title: String, val subtitle: String) {
     ALL_TRAFFIC(
-        "Весь трафик через туннель",
-        "Максимальная защита: все приложения и DNS идут через VLESS узел"
+        "Весь трафик через VPN (Global)",
+        "Все приложения и домены маршрутизируются через прокси-туннель"
     ),
     RU_BYPASS(
-        "Умный обход (РФ и локальные напрямую)",
-        "Сайты .ru / .рф и банки работают напрямую без задержки, остальной мир — через VLESS"
+        "Обход РФ (.ru / .рф / geoip:ru напрямую)",
+        "Российские сайты, банки и госсервисы работают напрямую без VPN"
     ),
     LOW_LATENCY_SPLIT(
-        "Только заблокированные и стриминг",
-        "Оптимизировано для минимального пинга в играх и 4K стриминга"
+        "Только заблокированные (Rule-based)",
+        "Через туннель идут только заблокированные ресурсы из гео-базы"
     )
 }
