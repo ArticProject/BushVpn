@@ -868,10 +868,12 @@ private fun IncyServerNodeRow(
                             color = colors.secondaryText
                         )
                     ) {
-                        append("JSON")
+                        append(if (server.isCustom) server.host else "JSON")
                     }
                 },
-                fontSize = 11.5.sp
+                fontSize = 11.5.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
             )
         }
 

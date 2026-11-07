@@ -131,12 +131,15 @@ object VlessParser {
             val serviceName = (params["serviceName"] ?: params["servicename"] ?: "").trim()
             val alpn = (params["alpn"] ?: "").trim()
 
-            val detectedCountry = detectCountry(remarkRaw, host)
-            val displayName = remarkRaw.ifBlank {
+            val effectiveRemark = remarkRaw.ifBlank {
+                (params["remarks"] ?: params["remark"] ?: params["ps"] ?: params["name"]).orEmpty().trim()
+            }
+            val detectedCountry = detectCountry(effectiveRemark, host)
+            val displayName = effectiveRemark.ifBlank {
                 if (detectedCountry.code == "VPN" || detectedCountry.code == "INFO") {
                     host
                 } else {
-                    detectedCountry.nameRu
+                    "${detectedCountry.nameRu} (${host})"
                 }
             }
 
@@ -368,7 +371,8 @@ object VlessParser {
 
     private fun decodeUrlComponentSafe(value: String): String {
         return runCatching {
-            URLDecoder.decode(value.replace("+", "%2B"), "UTF-8")
+            val sanitized = value.replace(Regex("%(?![0-9a-fA-F]{2})"), "%25")
+            URLDecoder.decode(sanitized, "UTF-8")
         }.getOrDefault(value)
     }
 

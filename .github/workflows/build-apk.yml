@@ -25,9 +25,9 @@ jobs:
       - name: Publish Bush-VPN.apk to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: v1.0.0
-          name: "Bush VPN (Android APK)"
-          body: "Нажми на **Bush-VPN.apk** ниже в разделе Assets, чтобы скачать и установить приложение на Android."
+          tag_name: v2.0.0
+          name: "Bush VPN v2.0 (Xray-core Android APK)"
+          body: "Нажми на **Bush-VPN.apk** ниже в разделе Assets, чтобы скачать и установить обновлённое приложение Bush VPN v2.0 (с рабочим ядром Xray-core и исправленным распознаванием стран)."
           files: Bush-VPN.apk
           prerelease: false
         env:
