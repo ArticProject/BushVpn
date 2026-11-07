@@ -17,7 +17,7 @@ data class VlessServerEntity(
     val uuid: String,
     val encryption: String = "none",
     val security: String = "reality", // reality, tls, none
-    val flow: String = "xtls-rprx-vision",
+    val flow: String = "",
     val networkType: String = "tcp", // tcp, ws, grpc, httpupgrade, xhttp
     val sni: String = "www.microsoft.com",
     val fingerprint: String = "chrome",
@@ -26,7 +26,7 @@ data class VlessServerEntity(
     val spiderX: String = "/",
     val wsPath: String = "/",
     val wsHost: String = "",
-    val grpcServiceName: String = "vless-grpc",
+    val grpcServiceName: String = "",
     val alpn: String = "h2,http/1.1",
     val pingMs: Int = 28,
     val loadPercent: Int = 14,
@@ -49,20 +49,47 @@ data class VlessServerEntity(
             "NL" -> "AMS"
             "CH" -> "ZRH"
             "US" -> "NYC"
-            "GB" -> "LON"
+            "GB", "UK" -> "LON"
             "TR" -> "IST"
             "KZ" -> "ALA"
             "SG" -> "SIN"
             "JP" -> "TYO"
             "SE" -> "STO"
             "FR" -> "PAR"
+            "LV" -> "RIX"
+            "EE" -> "TLL"
+            "LT" -> "VNO"
+            "AT" -> "VIE"
+            "CZ" -> "PRG"
+            "ES" -> "MAD"
+            "IT" -> "MIL"
+            "AE" -> "DXB"
+            "NO" -> "OSL"
+            "DK" -> "CPH"
+            "BE" -> "BRU"
+            "IE" -> "DUB"
+            "PT" -> "LIS"
+            "BG" -> "SOF"
+            "RO" -> "OTP"
+            "HU" -> "BUD"
+            "RS" -> "BEG"
+            "MD" -> "RMO"
+            "UA" -> "IEV"
+            "AM" -> "EVN"
+            "GE" -> "TBS"
+            "IL" -> "TLV"
+            "IN" -> "BOM"
+            "HK" -> "HKG"
+            "KR" -> "ICN"
+            "CA" -> "YYZ"
+            "BR" -> "GRU"
             else -> countryCode.uppercase().take(3)
         }
 
     val cityImageRes: Int
         get() = when (countryCode.uppercase()) {
-            "FI", "SE", "NL" -> R.drawable.img_city_helsinki_bw_1793947042162
-            "DE", "FR", "CH", "GB" -> R.drawable.img_city_frankfurt_bw_1793947042312
+            "FI", "SE", "NL", "NO", "DK", "LV", "EE", "LT" -> R.drawable.img_city_helsinki_bw_1793947042162
+            "DE", "FR", "CH", "GB", "UK", "AT", "BE" -> R.drawable.img_city_frankfurt_bw_1793947042312
             else -> R.drawable.img_city_warsaw_bw_1793947041805
         }
 
@@ -75,7 +102,7 @@ data class VlessServerEntity(
             "NL" -> "Amsterdam"
             "CH" -> "Zurich"
             "US" -> "New York"
-            "GB" -> "London"
+            "GB", "UK" -> "London"
             "TR" -> "Istanbul"
             "KZ" -> "Almaty"
             "SG" -> "Singapore"
@@ -83,6 +110,32 @@ data class VlessServerEntity(
             "SE" -> "Stockholm"
             "FR" -> "Paris"
             "AE" -> "Dubai"
+            "LV" -> "Riga"
+            "EE" -> "Tallinn"
+            "LT" -> "Vilnius"
+            "AT" -> "Vienna"
+            "CZ" -> "Prague"
+            "ES" -> "Madrid"
+            "IT" -> "Milan"
+            "NO" -> "Oslo"
+            "DK" -> "Copenhagen"
+            "BE" -> "Brussels"
+            "IE" -> "Dublin"
+            "PT" -> "Lisbon"
+            "BG" -> "Sofia"
+            "RO" -> "Bucharest"
+            "HU" -> "Budapest"
+            "RS" -> "Belgrade"
+            "MD" -> "Chisinau"
+            "UA" -> "Kyiv"
+            "AM" -> "Yerevan"
+            "GE" -> "Tbilisi"
+            "IL" -> "Tel Aviv"
+            "IN" -> "Mumbai"
+            "HK" -> "Hong Kong"
+            "KR" -> "Seoul"
+            "CA" -> "Toronto"
+            "BR" -> "Sao Paulo"
             else -> city
         }
     }
@@ -96,7 +149,7 @@ data class VlessServerEntity(
             "NL" -> "Netherlands"
             "CH" -> "Switzerland"
             "US" -> "United States"
-            "GB" -> "United Kingdom"
+            "GB", "UK" -> "United Kingdom"
             "TR" -> "Turkey"
             "KZ" -> "Kazakhstan"
             "SG" -> "Singapore"
@@ -104,8 +157,64 @@ data class VlessServerEntity(
             "SE" -> "Sweden"
             "FR" -> "France"
             "AE" -> "UAE"
+            "LV" -> "Latvia"
+            "EE" -> "Estonia"
+            "LT" -> "Lithuania"
+            "AT" -> "Austria"
+            "CZ" -> "Czechia"
+            "ES" -> "Spain"
+            "IT" -> "Italy"
+            "NO" -> "Norway"
+            "DK" -> "Denmark"
+            "BE" -> "Belgium"
+            "IE" -> "Ireland"
+            "PT" -> "Portugal"
+            "BG" -> "Bulgaria"
+            "RO" -> "Romania"
+            "HU" -> "Hungary"
+            "RS" -> "Serbia"
+            "MD" -> "Moldova"
+            "UA" -> "Ukraine"
+            "AM" -> "Armenia"
+            "GE" -> "Georgia"
+            "IL" -> "Israel"
+            "IN" -> "India"
+            "HK" -> "Hong Kong"
+            "KR" -> "South Korea"
+            "CA" -> "Canada"
+            "BR" -> "Brazil"
             else -> countryName
         }
+    }
+
+    /**
+     * Returns the clean server display title:
+     * - For the built-in BUSH server (!isCustom), returns localizedCountry(isEn).
+     * - For imported subscription/custom servers, strips any duplicate leading flag emoji from `name`
+     *   (since `flagEmoji` is already rendered in the left badge) and returns the server's real remark/name.
+     */
+    fun displayTitle(isEn: Boolean): String {
+        if (!isCustom) return localizedCountry(isEn)
+        val cleaned = stripLeadingFlags(name).trim()
+        return cleaned.ifBlank { localizedCountry(isEn) }
+    }
+
+    private fun stripLeadingFlags(input: String): String {
+        var text = input.trim()
+        if (flagEmoji.isNotBlank() && text.startsWith(flagEmoji)) {
+            text = text.removePrefix(flagEmoji).trim()
+        }
+        // Also strip any leading Unicode Regional Indicator pair (flag emoji)
+        var idx = 0
+        while (idx < text.length) {
+            val cp = text.codePointAt(idx)
+            if (cp in 0x1F1E6..0x1F1FF || Character.isWhitespace(cp)) {
+                idx += Character.charCount(cp)
+            } else {
+                break
+            }
+        }
+        return text.substring(idx).trim()
     }
 
     val protocolBadge: String

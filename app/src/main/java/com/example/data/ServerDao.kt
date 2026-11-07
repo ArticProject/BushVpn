@@ -19,6 +19,12 @@ interface ServerDao {
     @Query("DELETE FROM vless_servers WHERE isCustom = 0")
     suspend fun deleteDefaultServers()
 
+    @Query("DELETE FROM vless_servers WHERE subscriptionUrl = :subUrl AND isCustom = 1")
+    suspend fun deleteBySubscriptionUrl(subUrl: String)
+
+    @Query("DELETE FROM vless_servers WHERE providerName = :providerName AND isCustom = 1")
+    suspend fun deleteByProviderName(providerName: String)
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertServer(server: VlessServerEntity): Long
 

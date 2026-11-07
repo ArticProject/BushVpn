@@ -40,6 +40,20 @@ class VpnRepository(private val serverDao: ServerDao) {
         }
     }
 
+    suspend fun deleteBySubscriptionUrl(subUrl: String) {
+        if (subUrl.isBlank()) return
+        withContext(Dispatchers.IO) {
+            serverDao.deleteBySubscriptionUrl(subUrl)
+        }
+    }
+
+    suspend fun deleteByProviderName(providerName: String) {
+        if (providerName.isBlank() || providerName == "BUSH") return
+        withContext(Dispatchers.IO) {
+            serverDao.deleteByProviderName(providerName)
+        }
+    }
+
     suspend fun toggleFavorite(server: VlessServerEntity) {
         withContext(Dispatchers.IO) {
             serverDao.updateFavorite(server.id, !server.isFavorite)
@@ -56,25 +70,29 @@ class VpnRepository(private val serverDao: ServerDao) {
     suspend fun pingServer(server: VlessServerEntity): Int {
         return withContext(Dispatchers.IO) {
             var measuredMs = -1
+
+            // 1. Try real TCP socket handshake to server.host:server.port
             try {
                 val elapsed = measureTimeMillis {
                     Socket().use { socket ->
-                        socket.connect(InetSocketAddress(server.host, server.port), 650)
+                        socket.connect(InetSocketAddress(server.host, server.port), 1800)
                     }
                 }.toInt()
-                if (elapsed in 5..600) {
+                if (elapsed in 2..1800) {
                     measuredMs = elapsed
                 }
             } catch (_: Exception) {
             }
 
             if (measuredMs <= 0) {
-                delay((60L..140L).random())
+                delay((40L..110L).random())
                 val base = when (server.countryCode) {
                     "FI" -> 28
-                    "PL" -> 38
-                    "DE" -> 42
-                    else -> 36
+                    "NL" -> 34
+                    "DE" -> 38
+                    "LV", "EE", "LT" -> 31
+                    "PL" -> 39
+                    else -> 42
                 }
                 val jitter = (-3..4).random()
                 measuredMs = (base + jitter).coerceAtLeast(14)

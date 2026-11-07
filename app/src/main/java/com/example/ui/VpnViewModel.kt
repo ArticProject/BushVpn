@@ -21,6 +21,7 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
@@ -88,7 +89,9 @@ class VpnViewModel(
     )
     val selectedServerId: StateFlow<Long?> = _selectedServerId.asStateFlow()
 
-    private val _connectionStatus = MutableStateFlow(VpnConnectionStatus.DISCONNECTED)
+    private val _connectionStatus = MutableStateFlow(
+        if (AetherVpnService.isServiceActive) VpnConnectionStatus.CONNECTED else VpnConnectionStatus.DISCONNECTED
+    )
     val connectionStatus: StateFlow<VpnConnectionStatus> = _connectionStatus.asStateFlow()
 
     private val _handshakeStep = MutableStateFlow("Ready")
@@ -143,7 +146,9 @@ class VpnViewModel(
         _selectedServerId
     ) { servers, selectedId ->
         if (servers.isEmpty()) null
-        else servers.find { it.id == selectedId } ?: servers.first()
+        else servers.find { it.id == selectedId }
+            ?: servers.firstOrNull { it.isCustom && it.countryCode != "INFO" }
+            ?: servers.first()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     val filteredServers: StateFlow<List<VlessServerEntity>> = combine(
@@ -185,7 +190,40 @@ class VpnViewModel(
     init {
         viewModelScope.launch {
             repository.ensureSeeded()
-            appendLog("INFO", "BUSH VPN Sovereign X-Ray Core 1.8.24 initialized (VLESS REALITY)")
+            appendLog("INFO", "BUSH VPN Xray-core v26 initialized (VLESS / REALITY / TUN)")
+
+            // Automatically restore or refresh any saved subscription URL
+            val savedSubUrl = prefs?.getString("last_subscription_url", null).orEmpty()
+            val currentList = runCatching { repository.allServers.first() }.getOrDefault(emptyList())
+            val customSubUrls = currentList
+                .mapNotNull { it.subscriptionUrl.takeIf { url -> url.startsWith("http", ignoreCase = true) } }
+                .distinct()
+
+            val urlsToRefresh = (customSubUrls + listOfNotNull(savedSubUrl.takeIf { it.startsWith("http", ignoreCase = true) }))
+                .distinct()
+
+            if (urlsToRefresh.isNotEmpty()) {
+                urlsToRefresh.forEach { url ->
+                    launch(Dispatchers.IO) {
+                        VlessParser.fetchSubscriptionFromUrl(url).onSuccess { (provider, nodes) ->
+                            if (nodes.isNotEmpty()) {
+                                repository.deleteBySubscriptionUrl(url)
+                                repository.deleteByProviderName(provider)
+                                var firstId: Long? = null
+                                nodes.forEach { node ->
+                                    val newId = repository.addServer(node)
+                                    if (firstId == null && node.countryCode != "INFO") {
+                                        firstId = newId
+                                    }
+                                }
+                                if (_selectedServerId.value == null && firstId != null) {
+                                    _selectedServerId.value = firstId
+                                }
+                            }
+                        }
+                    }
+                }
+            }
         }
     }
 
@@ -258,7 +296,7 @@ class VpnViewModel(
         prefs?.edit()?.putLong("selected_server_id", server.id)?.apply()
         appendLog(
             "INFO",
-            "Selected node ${server.nodeAirportCode} • ${server.city} (${server.host}:${server.port})"
+            "Selected node ${server.displayTitle(_isEnglish.value)} (${server.host}:${server.port})"
         )
         if (wasConnected && context != null) {
             viewModelScope.launch {
@@ -268,10 +306,12 @@ class VpnViewModel(
     }
 
     fun selectBestServer(context: Context? = null) {
-        val best = allServers.value.minByOrNull { if (it.pingMs > 0) it.pingMs else 999 }
+        val best = allServers.value
+            .filter { it.countryCode != "INFO" }
+            .minByOrNull { if (it.pingMs > 0) it.pingMs else 999 }
         if (best != null) {
             selectServer(best, context)
-            showMessage("${best.nodeAirportCode} • ${best.city} (${best.pingMs}ms)")
+            showMessage("${best.flagEmoji} ${best.displayTitle(_isEnglish.value)} (${best.pingMs}ms)")
         }
     }
 
@@ -281,8 +321,19 @@ class VpnViewModel(
                 disconnect(context)
             }
             VpnConnectionStatus.DISCONNECTED -> {
-                val target = selectedServer.value ?: allServers.value.firstOrNull()
+                val all = allServers.value
+                val current = selectedServer.value
+                // If user has imported real servers, prefer a real imported server over the "Скоро" placeholder
+                val target = if (current != null && !current.isCustom) {
+                    all.firstOrNull { it.isCustom && it.countryCode != "INFO" } ?: current
+                } else {
+                    current ?: all.firstOrNull()
+                }
                 if (target != null) {
+                    if (target.id != _selectedServerId.value) {
+                        _selectedServerId.value = target.id
+                        prefs?.edit()?.putLong("selected_server_id", target.id)?.apply()
+                    }
                     connectToServer(context, target)
                 }
             }
@@ -295,18 +346,32 @@ class VpnViewModel(
 
         telemetryJob = viewModelScope.launch {
             _handshakeStep.value = "LINKING • ${server.nodeAirportCode}"
-            appendLog("REALITY", "Linking VLESS REALITY [${server.sni} • fp=${server.fingerprint}]")
-            delay(550)
+            appendLog("REALITY", "Starting Xray-core [${server.host}:${server.port} • ${server.security}]")
+            delay(350)
 
             startSystemVpnService(context, server)
             delay(450)
 
+            val coreErr = AetherVpnService.lastCoreError
+            if (!coreErr.isNullOrBlank()) {
+                appendLog("WARN", "Xray status: $coreErr")
+            } else if (AetherVpnService.lastCoreStatus.isNotBlank()) {
+                appendLog("INFO", AetherVpnService.lastCoreStatus)
+            }
+
             _connectionStatus.value = VpnConnectionStatus.CONNECTED
-            _handshakeStep.value = "ACTIVE • ${server.virtualIp}"
+            _handshakeStep.value = "ACTIVE • ${server.displayTitle(_isEnglish.value)}"
             appendLog(
                 "INFO",
-                "Tunnel established: ${server.nodeAirportCode} (${server.virtualIp}) • ${server.pingMs}ms"
+                "Tunnel established: ${server.displayTitle(_isEnglish.value)} (${server.host}:${server.port}) • ${server.pingMs}ms"
             )
+
+            if (!server.isCustom) {
+                showMessage(
+                    if (_isEnglish.value) "BUSH Free server is coming soon — select an imported subscription node for full VPN"
+                    else "Бесплатный сервер BUSH «Скоро» — выберите сервер из вашей подписки для работы VPN"
+                )
+            }
 
             var tick = 0
             while (_connectionStatus.value == VpnConnectionStatus.CONNECTED) {
@@ -341,20 +406,27 @@ class VpnViewModel(
         _downloadSpeedMbps.value = 0f
         _uploadSpeedMbps.value = 0f
         _speedHistory.value = List(28) { TrafficSample(0f, 0f) }
-        appendLog("WARN", "Sovereign tunnel disconnected")
+        appendLog("WARN", "Xray-core tunnel disconnected")
     }
 
     private fun startSystemVpnService(context: Context, server: VlessServerEntity) {
         try {
             val currentSettings = _settings.value
+            val xrayConfigJson = VlessParser.toXrayJsonConfig(
+                server = server,
+                settings = currentSettings,
+                includeTunInbound = true
+            )
             val intent = Intent(context, AetherVpnService::class.java).apply {
                 action = AetherVpnService.ACTION_CONNECT
-                putExtra(AetherVpnService.EXTRA_SERVER_NAME, server.name)
+                putExtra(AetherVpnService.EXTRA_SERVER_NAME, server.displayTitle(_isEnglish.value))
                 putExtra(AetherVpnService.EXTRA_SERVER_HOST, server.host)
                 putExtra(AetherVpnService.EXTRA_PRIMARY_DNS, currentSettings.primaryDns)
                 putExtra(AetherVpnService.EXTRA_SECONDARY_DNS, currentSettings.secondaryDns)
                 putExtra(AetherVpnService.EXTRA_MTU, currentSettings.mtu)
                 putExtra(AetherVpnService.EXTRA_IPV6, currentSettings.enableIpv6)
+                putExtra(AetherVpnService.EXTRA_IS_CUSTOM_SERVER, server.isCustom)
+                putExtra(AetherVpnService.EXTRA_XRAY_CONFIG, xrayConfigJson)
             }
             ContextCompat.startForegroundService(context, intent)
         } catch (_: Exception) {
@@ -394,7 +466,7 @@ class VpnViewModel(
         viewModelScope.launch {
             _pingingServerIds.update { it + server.id }
             val rtt = repository.pingServer(server)
-            appendLog("INFO", "Ping ${server.nodeAirportCode} (${server.city}): ${rtt}ms")
+            appendLog("INFO", "Ping ${server.displayTitle(_isEnglish.value)} (${server.host}): ${rtt}ms")
             _pingingServerIds.update { it - server.id }
         }
     }
@@ -403,6 +475,33 @@ class VpnViewModel(
         if (_isPingingAll.value) return
         viewModelScope.launch {
             _isPingingAll.value = true
+
+            // Also refresh any HTTP subscription URLs so server names & flags stay up-to-date
+            val subUrls = allServers.value
+                .mapNotNull { it.subscriptionUrl.takeIf { u -> u.startsWith("http", ignoreCase = true) } }
+                .distinct()
+            subUrls.forEach { url ->
+                withContext(Dispatchers.IO) {
+                    VlessParser.fetchSubscriptionFromUrl(url).onSuccess { (provider, nodes) ->
+                        if (nodes.isNotEmpty()) {
+                            repository.deleteBySubscriptionUrl(url)
+                            repository.deleteByProviderName(provider)
+                            var firstId: Long? = null
+                            nodes.forEach { node ->
+                                val id = repository.addServer(node)
+                                if (firstId == null && node.countryCode != "INFO") {
+                                    firstId = id
+                                }
+                            }
+                            if (firstId != null) {
+                                _selectedServerId.value = firstId
+                                prefs?.edit()?.putLong("selected_server_id", firstId!!)?.apply()
+                            }
+                        }
+                    }
+                }
+            }
+
             val list = allServers.value
             list.forEach { srv ->
                 _pingingServerIds.update { it + srv.id }
@@ -413,9 +512,11 @@ class VpnViewModel(
             }
             delay(450)
             _isPingingAll.value = false
-            val fastest = allServers.value.minByOrNull { it.pingMs }
+            val fastest = allServers.value
+                .filter { it.countryCode != "INFO" }
+                .minByOrNull { it.pingMs }
             if (fastest != null) {
-                showMessage("${fastest.flagEmoji} ${fastest.localizedCountry(_isEnglish.value)}: ${fastest.pingMs}ms")
+                showMessage("${fastest.flagEmoji} ${fastest.displayTitle(_isEnglish.value)}: ${fastest.pingMs}ms")
             }
         }
     }
@@ -428,12 +529,12 @@ class VpnViewModel(
         viewModelScope.launch {
             if (isEdit && server.id != 0L) {
                 repository.updateServer(server)
-                showMessage("Обновлён: ${server.name}")
+                showMessage("Обновлён: ${server.displayTitle(_isEnglish.value)}")
             } else {
                 val id = repository.addServer(server)
                 _selectedServerId.value = id
                 prefs?.edit()?.putLong("selected_server_id", id)?.apply()
-                showMessage("Добавлен: ${server.name}")
+                showMessage("Добавлен: ${server.displayTitle(_isEnglish.value)}")
             }
         }
     }
@@ -441,7 +542,14 @@ class VpnViewModel(
     fun deleteServer(server: VlessServerEntity) {
         viewModelScope.launch {
             repository.deleteServer(server)
-            showMessage("Удалён: ${server.name}")
+            showMessage("Удалён: ${server.displayTitle(_isEnglish.value)}")
+        }
+    }
+
+    fun deleteProviderGroup(providerName: String) {
+        viewModelScope.launch {
+            repository.deleteByProviderName(providerName)
+            showMessage("Подписка $providerName удалена")
         }
     }
 
@@ -465,15 +573,22 @@ class VpnViewModel(
 
         if (text.startsWith("http://", ignoreCase = true) || text.startsWith("https://", ignoreCase = true)) {
             viewModelScope.launch {
+                prefs?.edit()?.putString("last_subscription_url", text)?.apply()
                 showMessage(if (_isEnglish.value) "Loading subscription..." else "Загрузка подписки...")
                 val result = withContext(Dispatchers.IO) {
                     VlessParser.fetchSubscriptionFromUrl(text)
                 }
                 result.onSuccess { (provider, nodes) ->
+                    // Replace previous nodes for this subscription URL / provider cleanly
+                    repository.deleteBySubscriptionUrl(text)
+                    repository.deleteByProviderName(provider)
+
                     var firstId: Long? = null
                     nodes.forEach { node ->
                         val id = repository.addServer(node)
-                        if (firstId == null) firstId = id
+                        if (firstId == null && node.countryCode != "INFO") {
+                            firstId = id
+                        }
                     }
                     if (firstId != null) {
                         _selectedServerId.value = firstId
@@ -495,13 +610,16 @@ class VpnViewModel(
         val multiNodes = VlessParser.parseSubscriptionPayload(text, providerName = "CUSTOM VLESS")
         if (multiNodes.isNotEmpty()) {
             viewModelScope.launch {
-                var lastId = 0L
+                var firstId: Long? = null
                 multiNodes.forEach { node ->
-                    lastId = repository.addServer(node)
+                    val id = repository.addServer(node)
+                    if (firstId == null && node.countryCode != "INFO") {
+                        firstId = id
+                    }
                 }
-                if (lastId > 0L) {
-                    _selectedServerId.value = lastId
-                    prefs?.edit()?.putLong("selected_server_id", lastId)?.apply()
+                if (firstId != null) {
+                    _selectedServerId.value = firstId
+                    prefs?.edit()?.putLong("selected_server_id", firstId!!)?.apply()
                 }
                 showMessage(
                     if (_isEnglish.value) "Imported ${multiNodes.size} server(s)"
@@ -519,7 +637,7 @@ class VpnViewModel(
                 val newId = repository.addServer(parsedServer)
                 _selectedServerId.value = newId
                 prefs?.edit()?.putLong("selected_server_id", newId)?.apply()
-                showMessage("Добавлен: ${parsedServer.localizedCountry(_isEnglish.value)}")
+                showMessage("Добавлен: ${parsedServer.displayTitle(_isEnglish.value)}")
                 onSuccess()
             }
         }.onFailure { err ->

@@ -582,10 +582,10 @@ internal fun IncyProviderGroupCard(
                                 )
                                 if (firstNode.isCustom) {
                                     DropdownMenuItem(
-                                        text = { Text("Удалить сервер") },
+                                        text = { Text("Удалить подписку ($providerTitle)") },
                                         onClick = {
                                             showMenu = false
-                                            onDeleteNode(firstNode)
+                                            nodes.forEach { onDeleteNode(it) }
                                         }
                                     )
                                 }
@@ -829,10 +829,10 @@ private fun IncyServerNodeRow(
 
         Spacer(modifier = Modifier.width(12.dp))
 
-        // Center Country Name + "VLESS · TCP · JSON" subtitle
+        // Center Server Title (Remark / Country) + "VLESS · TCP · JSON" subtitle
         Column(modifier = Modifier.weight(1f)) {
             Text(
-                text = server.localizedCountry(isEnglish),
+                text = server.displayTitle(isEnglish),
                 fontFamily = SpaceGroteskFontFamily,
                 fontWeight = FontWeight.Bold,
                 fontSize = 15.5.sp,

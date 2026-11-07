@@ -421,7 +421,7 @@ fun DashboardScreen(
                             )
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "${activeNode.flagEmoji} ${activeNode.localizedCountry(isEnglish)}",
+                                text = "${activeNode.flagEmoji} ${activeNode.displayTitle(isEnglish)}",
                                 fontFamily = PlusJakartaFontFamily,
                                 fontWeight = FontWeight.Bold,
                                 fontSize = 13.sp,
