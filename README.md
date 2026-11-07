@@ -1,20 +1,21 @@
-# Bush VPN (VLESS / REALITY / X-Ray)
+# Bush VPN v2.0 (VLESS / REALITY / Xray-core)
 
-Минималистичный суверенный VPN-клиент для Android с поддержкой протоколов **VLESS REALITY**, **XTLS-Vision**, **WS / gRPC**.
-
----
-
-## 📥 Скачать APK на Android
-
-Нажми на любую из ссылок ниже прямо с телефона, чтобы сразу скачать готовый установочный файл **`Bush-VPN.apk`**:
-
-👉 **[Скачать Bush-VPN.apk (Прямая ссылка из репозитория)](./Bush-VPN.apk?raw=true)**
-
-👉 **[Открыть раздел Releases](../../releases/latest)**
+Минималистичный VPN-клиент для Android в стиле **Incy / Happ** с встроенным нативным ядром **Xray-core v26 (`libv2ray`)**, поддержкой подписок и ключей **VLESS REALITY**, **XTLS-Vision**, **WS / gRPC**, **Shadowsocks**.
 
 ---
 
-### Как скачать вручную со страницы репозитория GitHub:
-1. В списке файлов выше нажми на файл **`Bush-VPN.apk`**.
-2. На открывшейся странице нажми кнопку **Download raw file** (иконка стрелки вниз `⬇` справа сверху) или **View raw**.
-3. Установи скачанный **`Bush-VPN.apk`** на Android-смартфон.
+## 📥 Скачать Bush VPN v2.0 (APK на Android)
+
+Нажми на ссылку ниже прямо с телефона, чтобы скачать свежую версию **`Bush-VPN.apk` (v2.0)**:
+
+👉 **[Скачать Bush-VPN.apk v2.0 (Из GitHub Releases — Рекомендуется)](../../releases/latest/download/Bush-VPN.apk)**
+
+👉 **[Скачать Bush-VPN.apk v2.0 (Прямая ссылка из репозитория)](./Bush-VPN.apk?raw=true)**
+
+👉 **[Открыть страницу Releases (v2.0.0)](../../releases/latest)**
+
+---
+
+### Важно после отправки кода из AI Studio на GitHub:
+1. Когда вы нажимаете **Push to GitHub** в AI Studio, на GitHub автоматически запускается сборка **GitHub Actions** (`Publish Bush VPN APK`), которая за **~1–2 минуты** собирает свежий **`Bush-VPN.apk` (v2.0)** из нового кода и обновляет файл в репозитории и в разделе **Releases**.
+2. Перед установкой новой версии рекомендуется удалить старую версию `1.0` с телефона или установить `2.0` поверх неё.

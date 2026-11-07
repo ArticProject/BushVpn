@@ -86,13 +86,6 @@ data class VlessServerEntity(
             else -> countryCode.uppercase().take(3)
         }
 
-    val cityImageRes: Int
-        get() = when (countryCode.uppercase()) {
-            "FI", "SE", "NL", "NO", "DK", "LV", "EE", "LT" -> R.drawable.img_city_helsinki_bw_1793947042162
-            "DE", "FR", "CH", "GB", "UK", "AT", "BE" -> R.drawable.img_city_frankfurt_bw_1793947042312
-            else -> R.drawable.img_city_warsaw_bw_1793947041805
-        }
-
     fun localizedCity(isEn: Boolean): String {
         if (!isEn) return city
         return when (countryCode.uppercase()) {
