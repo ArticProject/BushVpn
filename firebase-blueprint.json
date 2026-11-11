@@ -1,0 +1,105 @@
+{
+  "entities": {
+    "UserAccount": {
+      "title": "UserAccount",
+      "description": "Registered BushVPN operator profile and email verification state",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Authenticated user UID"
+        },
+        "email": {
+          "type": "string",
+          "description": "User email address"
+        },
+        "name": {
+          "type": "string",
+          "description": "Display name"
+        },
+        "username": {
+          "type": "string",
+          "description": "Unique handle without @"
+        },
+        "emailVerified": {
+          "type": "boolean",
+          "description": "Whether the 6-digit email verification code was confirmed"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation via FieldValue.serverTimestamp()"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last update via FieldValue.serverTimestamp()"
+        }
+      },
+      "required": [
+        "userId",
+        "email",
+        "name",
+        "username",
+        "emailVerified",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "VerificationCode": {
+      "title": "VerificationCode",
+      "description": "6-digit verification code sent to a user's email address",
+      "type": "object",
+      "properties": {
+        "userId": {
+          "type": "string",
+          "description": "Owner user UID"
+        },
+        "email": {
+          "type": "string",
+          "description": "Target email address"
+        },
+        "code": {
+          "type": "string",
+          "description": "6-digit verification code"
+        },
+        "verified": {
+          "type": "boolean",
+          "description": "Whether this code has been verified"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when code was generated via FieldValue.serverTimestamp()"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when code was updated via FieldValue.serverTimestamp()"
+        }
+      },
+      "required": [
+        "userId",
+        "email",
+        "code",
+        "verified",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": {
+        "$ref": "#/entities/UserAccount"
+      },
+      "description": "User account documents keyed by authenticated userId"
+    },
+    "/users/{userId}/codes/{codeId}": {
+      "schema": {
+        "$ref": "#/entities/VerificationCode"
+      },
+      "description": "Email verification code documents scoped to a user"
+    }
+  }
+}

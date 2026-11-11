@@ -8,104 +8,108 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import com.example.R
 
-val SpaceGroteskFontFamily = FontFamily(
-    Font(R.font.space_grotesk, FontWeight.Normal),
-    Font(R.font.space_grotesk, FontWeight.Medium),
-    Font(R.font.space_grotesk, FontWeight.Bold)
+// Unified iOS / T-Bank geometric humanist typography (Manrope + Plus Jakarta Sans)
+// Replaces blocky cyber/monospace fonts so every screen feels like native iOS / T-Bank.
+val ManropeFontFamily = FontFamily(
+    Font(R.font.manrope, FontWeight.Normal),
+    Font(R.font.manrope, FontWeight.Medium),
+    Font(R.font.manrope, FontWeight.SemiBold),
+    Font(R.font.manrope, FontWeight.Bold)
 )
 
-val JetBrainsMonoFontFamily = FontFamily(
-    Font(R.font.jetbrains_mono, FontWeight.Normal),
-    Font(R.font.jetbrains_mono, FontWeight.Medium),
-    Font(R.font.jetbrains_mono, FontWeight.Bold)
+val CaveatFontFamily = FontFamily(
+    Font(R.font.caveat, FontWeight.Normal),
+    Font(R.font.caveat, FontWeight.Bold)
 )
 
-val PlusJakartaFontFamily = FontFamily(
-    Font(R.font.plus_jakarta_sans, FontWeight.Normal),
-    Font(R.font.plus_jakarta_sans, FontWeight.Medium),
-    Font(R.font.plus_jakarta_sans, FontWeight.SemiBold),
-    Font(R.font.plus_jakarta_sans, FontWeight.Bold)
-)
+val SpaceGroteskFontFamily = ManropeFontFamily
+val JetBrainsMonoFontFamily = ManropeFontFamily
+val PlusJakartaFontFamily = ManropeFontFamily
 
 val Typography = Typography(
     displayLarge = TextStyle(
-        fontFamily = SpaceGroteskFontFamily,
+        fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 44.sp,
-        lineHeight = 52.sp,
-        letterSpacing = (-0.5).sp
+        fontSize = 42.sp,
+        lineHeight = 48.sp,
+        letterSpacing = (-0.8).sp
     ),
     displayMedium = TextStyle(
-        fontFamily = SpaceGroteskFontFamily,
+        fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.Bold,
-        fontSize = 34.sp,
-        lineHeight = 40.sp,
-        letterSpacing = (-0.25).sp
+        fontSize = 32.sp,
+        lineHeight = 38.sp,
+        letterSpacing = (-0.6).sp
     ),
     headlineLarge = TextStyle(
-        fontFamily = SpaceGroteskFontFamily,
+        fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 26.sp,
-        lineHeight = 32.sp
+        lineHeight = 32.sp,
+        letterSpacing = (-0.4).sp
     ),
     headlineMedium = TextStyle(
-        fontFamily = SpaceGroteskFontFamily,
+        fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 22.sp,
-        lineHeight = 28.sp
+        lineHeight = 28.sp,
+        letterSpacing = (-0.3).sp
     ),
     titleLarge = TextStyle(
-        fontFamily = SpaceGroteskFontFamily,
+        fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.Bold,
         fontSize = 19.sp,
-        lineHeight = 26.sp
+        lineHeight = 24.sp,
+        letterSpacing = (-0.25).sp
     ),
     titleMedium = TextStyle(
-        fontFamily = PlusJakartaFontFamily,
+        fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 16.sp,
-        lineHeight = 22.sp
+        lineHeight = 21.sp,
+        letterSpacing = (-0.15).sp
     ),
     titleSmall = TextStyle(
-        fontFamily = PlusJakartaFontFamily,
+        fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.SemiBold,
         fontSize = 14.sp,
-        lineHeight = 20.sp
+        lineHeight = 19.sp,
+        letterSpacing = (-0.1).sp
     ),
     bodyLarge = TextStyle(
-        fontFamily = PlusJakartaFontFamily,
-        fontWeight = FontWeight.Normal,
+        fontFamily = ManropeFontFamily,
+        fontWeight = FontWeight.Medium,
         fontSize = 15.sp,
-        lineHeight = 22.sp
+        lineHeight = 21.sp
     ),
     bodyMedium = TextStyle(
-        fontFamily = PlusJakartaFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 13.sp,
-        lineHeight = 19.sp
+        fontFamily = ManropeFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 13.5.sp,
+        lineHeight = 18.sp
     ),
     bodySmall = TextStyle(
-        fontFamily = PlusJakartaFontFamily,
+        fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
         lineHeight = 16.sp
     ),
     labelLarge = TextStyle(
-        fontFamily = JetBrainsMonoFontFamily,
-        fontWeight = FontWeight.Medium,
+        fontFamily = ManropeFontFamily,
+        fontWeight = FontWeight.SemiBold,
         fontSize = 13.sp,
-        lineHeight = 18.sp
+        lineHeight = 17.sp
     ),
     labelMedium = TextStyle(
-        fontFamily = JetBrainsMonoFontFamily,
+        fontFamily = ManropeFontFamily,
         fontWeight = FontWeight.Medium,
-        fontSize = 11.sp,
+        fontSize = 11.5.sp,
         lineHeight = 15.sp
     ),
     labelSmall = TextStyle(
-        fontFamily = JetBrainsMonoFontFamily,
-        fontWeight = FontWeight.Normal,
-        fontSize = 10.sp,
+        fontFamily = ManropeFontFamily,
+        fontWeight = FontWeight.Medium,
+        fontSize = 10.5.sp,
         lineHeight = 14.sp
     )
 )

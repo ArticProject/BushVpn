@@ -12,56 +12,80 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.Crossfade
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideInVertically
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.slideOutVertically
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.safeDrawing
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Dns
-import androidx.compose.material.icons.filled.Key
+import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Snackbar
-import androidx.compose.material3.SnackbarHost
-import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
+import androidx.core.content.ContextCompat
+import com.example.data.AccountRepository
 import com.example.data.AppDatabase
 import com.example.data.VlessServerEntity
 import com.example.data.VpnRepository
@@ -79,6 +103,10 @@ import com.example.ui.screens.ServersScreen
 import com.example.ui.screens.WelcomeScreen
 import com.example.ui.theme.AetherVpnTheme
 import com.example.ui.theme.LocalAstralColors
+import com.example.ui.theme.PlusJakartaFontFamily
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
+import kotlin.math.absoluteValue
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -87,11 +115,17 @@ class MainActivity : ComponentActivity() {
 
         val database = AppDatabase.getDatabase(applicationContext)
         val repository = VpnRepository(database.serverDao())
+        val accountRepository = runCatching { AccountRepository(applicationContext) }.getOrNull()
         val prefs = applicationContext.getSharedPreferences("bush_vpn_prefs", Context.MODE_PRIVATE)
 
         setContent {
             val vpnViewModel: VpnViewModel = viewModel(
-                factory = VpnViewModel.Factory(repository, prefs)
+                factory = VpnViewModel.Factory(
+                    repository = repository,
+                    prefs = prefs,
+                    accountDao = database.accountDao(),
+                    accountRepository = accountRepository
+                )
             )
             val isDarkTheme by vpnViewModel.isDarkTheme.collectAsStateWithLifecycle()
 
@@ -102,9 +136,10 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-private data class FloatingTabItem(
+private data class BottomTabItem(
     val icon: ImageVector,
-    val contentDescription: String,
+    val labelRu: String,
+    val labelEn: String,
     val tag: String
 )
 
@@ -122,13 +157,20 @@ private fun isNetworkCurrentlyOnline(context: Context): Boolean {
 fun AstralRootApp(vpnViewModel: VpnViewModel) {
     val context = LocalContext.current
     val colors = LocalAstralColors.current
+    val pagerScope = rememberCoroutineScope()
 
     val appStage by vpnViewModel.appStage.collectAsStateWithLifecycle()
     val isDarkTheme by vpnViewModel.isDarkTheme.collectAsStateWithLifecycle()
     val isEnglish by vpnViewModel.isEnglish.collectAsStateWithLifecycle()
+    val isRegistrationCompleted by vpnViewModel.isRegistrationCompleted.collectAsStateWithLifecycle()
     val operatorName by vpnViewModel.operatorName.collectAsStateWithLifecycle()
+    val operatorEmail by vpnViewModel.operatorEmail.collectAsStateWithLifecycle()
+    val operatorUsername by vpnViewModel.operatorUsername.collectAsStateWithLifecycle()
     val operatorUid by vpnViewModel.operatorUid.collectAsStateWithLifecycle()
     val avatarFilePath by vpnViewModel.avatarFilePath.collectAsStateWithLifecycle()
+    val latestVerificationCode by vpnViewModel.latestVerificationCode.collectAsStateWithLifecycle()
+    val emailDispatchResult by vpnViewModel.emailDispatchResult.collectAsStateWithLifecycle()
+    val smtpConfig by vpnViewModel.smtpConfig.collectAsStateWithLifecycle()
 
     val connectionStatus by vpnViewModel.connectionStatus.collectAsStateWithLifecycle()
     val connectedSeconds by vpnViewModel.connectedSeconds.collectAsStateWithLifecycle()
@@ -143,10 +185,36 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
     val coreLogs by vpnViewModel.coreLogs.collectAsStateWithLifecycle()
     val snackbarMessage by vpnViewModel.snackbarMessage.collectAsStateWithLifecycle()
 
-    var currentTab by rememberSaveable { mutableIntStateOf(0) }
+    val pagerState = rememberPagerState(initialPage = 0, pageCount = { 3 })
     var showAddOrEditDialog by remember { mutableStateOf(false) }
     var editingServer by remember { mutableStateOf<VlessServerEntity?>(null) }
     var inspectingXrayServer by remember { mutableStateOf<VlessServerEntity?>(null) }
+
+    // Top T-Bank / iOS Notification Island state
+    var islandMessage by remember { mutableStateOf<String?>(null) }
+    var showConnectedBanner by remember { mutableStateOf(false) }
+
+    LaunchedEffect(snackbarMessage) {
+        val msg = snackbarMessage
+        if (!msg.isNullOrBlank()) {
+            islandMessage = msg
+            vpnViewModel.clearSnackbar()
+            delay(2600)
+            if (islandMessage == msg) {
+                islandMessage = null
+            }
+        }
+    }
+
+    LaunchedEffect(connectionStatus) {
+        if (connectionStatus == VpnConnectionStatus.CONNECTED) {
+            showConnectedBanner = true
+            delay(2400)
+            showConnectedBanner = false
+        } else {
+            showConnectedBanner = false
+        }
+    }
 
     // Real system network state + manual offline preview state
     var isSystemOffline by remember { mutableStateOf(!isNetworkCurrentlyOnline(context)) }
@@ -169,28 +237,24 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
         }
     }
 
-    val snackbarHostState = remember { SnackbarHostState() }
-
-    LaunchedEffect(snackbarMessage) {
-        val msg = snackbarMessage
-        if (!msg.isNullOrBlank()) {
-            snackbarHostState.showSnackbar(msg)
-            vpnViewModel.clearSnackbar()
-        }
-    }
-
     BackHandler(
         enabled = isManualOfflinePreview ||
             appStage == AppStage.ADVANTAGES ||
-            (appStage == AppStage.MAIN_ENCLAVE && currentTab != 0)
+            (appStage == AppStage.MAIN_ENCLAVE && pagerState.currentPage != 0)
     ) {
         if (isManualOfflinePreview) {
             isManualOfflinePreview = false
         } else if (appStage == AppStage.ADVANTAGES) {
             vpnViewModel.backToWelcome()
-        } else if (currentTab != 0) {
-            currentTab = 0
+        } else if (pagerState.currentPage != 0) {
+            pagerScope.launch {
+                pagerState.animateScrollToPage(0, animationSpec = tween(300, easing = FastOutSlowInEasing))
+            }
         }
+    }
+
+    val handleSendEmailCode: (String) -> Unit = { email ->
+        vpnViewModel.sendEmailVerificationCode(context, email)
     }
 
     val vpnPermissionLauncher = rememberLauncherForActivityResult(
@@ -216,45 +280,58 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
         }
     }
 
-    val floatingTabs = remember {
+    val bottomTabs = remember {
         listOf(
-            FloatingTabItem(Icons.Default.Key, "Tunnel Key", "nav_tab_tunnel"),
-            FloatingTabItem(Icons.Default.Dns, "Global Nodes", "nav_tab_servers"),
-            FloatingTabItem(Icons.Default.Person, "Sovereign Operator", "nav_tab_profile")
+            BottomTabItem(Icons.Default.Home, "Главная", "Home", "nav_tab_tunnel"),
+            BottomTabItem(Icons.Default.Dns, "Серверы", "Servers", "nav_tab_servers"),
+            BottomTabItem(Icons.Default.Person, "Профиль", "Profile", "nav_tab_profile")
         )
     }
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         containerColor = colors.background,
-        contentWindowInsets = WindowInsets.safeDrawing,
-        snackbarHost = {
-            SnackbarHost(hostState = snackbarHostState) { data ->
-                Snackbar(
-                    snackbarData = data,
-                    containerColor = colors.primaryInk,
-                    contentColor = colors.onPrimaryInk
-                )
-            }
-        }
+        contentWindowInsets = WindowInsets.safeDrawing
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            Crossfade(
+            AnimatedContent(
                 targetState = appStage,
-                animationSpec = tween(320),
-                label = "stage_crossfade"
+                transitionSpec = {
+                    val forward = targetState.ordinal >= initialState.ordinal
+                    val enterSlide = slideInHorizontally(
+                        animationSpec = tween(340, easing = FastOutSlowInEasing),
+                        initialOffsetX = { fullWidth -> if (forward) fullWidth / 3 else -fullWidth / 3 }
+                    ) + fadeIn(animationSpec = tween(280))
+                    val exitSlide = slideOutHorizontally(
+                        animationSpec = tween(320, easing = FastOutSlowInEasing),
+                        targetOffsetX = { fullWidth -> if (forward) -fullWidth / 4 else fullWidth / 4 }
+                    ) + fadeOut(animationSpec = tween(240))
+                    enterSlide togetherWith exitSlide
+                },
+                label = "stage_slide_transition"
             ) { stage ->
                 when (stage) {
                     AppStage.WELCOME -> {
                         WelcomeScreen(
                             isEnglish = isEnglish,
                             isDarkTheme = isDarkTheme,
+                            isRegistrationCompleted = isRegistrationCompleted,
+                            initialEmail = operatorEmail,
+                            initialName = operatorName,
+                            initialUsername = operatorUsername,
+                            latestVerificationCode = latestVerificationCode,
+                            emailDispatchResult = emailDispatchResult,
+                            smtpConfig = smtpConfig,
+                            onSaveSmtpConfig = vpnViewModel::saveSmtpConfig,
+                            onSendEmailCode = handleSendEmailCode,
+                            onVerifyEmailCode = vpnViewModel::verifyEmailCode,
                             onToggleLanguage = vpnViewModel::toggleLanguage,
                             onToggleTheme = vpnViewModel::toggleTheme,
+                            onCompleteRegistration = vpnViewModel::completeRegistration,
                             onStartClick = vpnViewModel::goToAdvantages
                         )
                     }
@@ -273,127 +350,182 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
 
                     AppStage.MAIN_ENCLAVE -> {
                         Box(modifier = Modifier.fillMaxSize()) {
-                            when (currentTab) {
-                                0 -> DashboardScreen(
-                                    connectionStatus = connectionStatus,
-                                    connectedSeconds = connectedSeconds,
-                                    selectedServer = selectedServer,
-                                    allServers = allServers,
-                                    isEnglish = isEnglish,
-                                    isDarkTheme = isDarkTheme,
-                                    isPingingAll = isPingingAll,
-                                    pingingServerIds = pingingServerIds,
-                                    settings = settings,
-                                    coreLogs = coreLogs,
-                                    onUpdateSettings = vpnViewModel::updateSettings,
-                                    onClearLogs = vpnViewModel::clearLogs,
-                                    onToggleLanguage = vpnViewModel::toggleLanguage,
-                                    onToggleTheme = vpnViewModel::toggleTheme,
-                                    onToggleConnection = handleToggleConnection,
-                                    onSelectServer = { srv -> vpnViewModel.selectServer(srv, context) },
-                                    onOpenServerList = { currentTab = 1 },
-                                    onOpenAddServer = {
-                                        editingServer = null
-                                        showAddOrEditDialog = true
-                                    },
-                                    onOpenXrayConfig = { srv -> inspectingXrayServer = srv },
-                                    onPingServer = vpnViewModel::pingSingleServer,
-                                    onPingAll = vpnViewModel::pingAllServers,
-                                    onImportSubscriptionText = vpnViewModel::importSubscriptionOrUri,
-                                    onCopiedMessage = vpnViewModel::showMessage,
-                                    onDeleteServer = vpnViewModel::deleteServer,
-                                    onReplayOnboarding = vpnViewModel::replayOnboarding,
-                                    onTriggerNoInternetDemo = { isManualOfflinePreview = true }
-                                )
+                            // Smooth Swipeable HorizontalPager across the 3 main screens
+                            HorizontalPager(
+                                state = pagerState,
+                                beyondViewportPageCount = 1,
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(bottom = 86.dp)
+                            ) { page ->
+                                val pageOffset = (
+                                    (pagerState.currentPage - page) + pagerState.currentPageOffsetFraction
+                                ).absoluteValue.coerceIn(0f, 1f)
 
-                                1 -> ServersScreen(
-                                    servers = filteredServers,
-                                    allServers = allServers,
-                                    selectedServerId = selectedServer?.id,
-                                    searchQuery = searchQuery,
-                                    selectedFilter = selectedFilter,
-                                    isEnglish = isEnglish,
-                                    isPingingAll = isPingingAll,
-                                    pingingServerIds = pingingServerIds,
-                                    onBackClick = { currentTab = 0 },
-                                    onSearchChange = vpnViewModel::setSearchQuery,
-                                    onFilterChange = vpnViewModel::setFilter,
-                                    onSelectServer = { srv ->
-                                        vpnViewModel.selectServer(srv, context)
-                                    },
-                                    onToggleFavorite = vpnViewModel::toggleFavorite,
-                                    onPingServer = vpnViewModel::pingSingleServer,
-                                    onPingAll = vpnViewModel::pingAllServers,
-                                    onAddServerClick = {
-                                        editingServer = null
-                                        showAddOrEditDialog = true
-                                    },
-                                    onDeleteServerClick = vpnViewModel::deleteServer,
-                                    onOpenXrayConfig = { srv -> inspectingXrayServer = srv },
-                                    onImportSubscriptionText = vpnViewModel::importSubscriptionOrUri,
-                                    onToggleEuropePack = vpnViewModel::toggleEuropeSubscriptionPack,
-                                    onCopiedMessage = vpnViewModel::showMessage
-                                )
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .graphicsLayer {
+                                            val scale = 1f - (0.04f * pageOffset)
+                                            scaleX = scale
+                                            scaleY = scale
+                                            alpha = 1f - (0.20f * pageOffset)
+                                        }
+                                ) {
+                                    when (page) {
+                                        0 -> DashboardScreen(
+                                            connectionStatus = connectionStatus,
+                                            connectedSeconds = connectedSeconds,
+                                            selectedServer = selectedServer,
+                                            allServers = allServers,
+                                            isEnglish = isEnglish,
+                                            isDarkTheme = isDarkTheme,
+                                            isPingingAll = isPingingAll,
+                                            pingingServerIds = pingingServerIds,
+                                            settings = settings,
+                                            coreLogs = coreLogs,
+                                            onUpdateSettings = vpnViewModel::updateSettings,
+                                            onClearLogs = vpnViewModel::clearLogs,
+                                            onToggleLanguage = vpnViewModel::toggleLanguage,
+                                            onToggleTheme = vpnViewModel::toggleTheme,
+                                            onToggleConnection = handleToggleConnection,
+                                            onSelectServer = { srv -> vpnViewModel.selectServer(srv, context) },
+                                            onToggleFavorite = vpnViewModel::toggleFavorite,
+                                            onOpenServerList = {
+                                                pagerScope.launch {
+                                                    pagerState.animateScrollToPage(
+                                                        1,
+                                                        animationSpec = tween(320, easing = FastOutSlowInEasing)
+                                                    )
+                                                }
+                                            },
+                                            onOpenAddServer = {
+                                                editingServer = null
+                                                showAddOrEditDialog = true
+                                            },
+                                            onOpenXrayConfig = { srv -> inspectingXrayServer = srv },
+                                            onPingServer = vpnViewModel::pingSingleServer,
+                                            onPingAll = vpnViewModel::pingAllServers,
+                                            onImportSubscriptionText = vpnViewModel::importSubscriptionOrUri,
+                                            onCopiedMessage = vpnViewModel::showMessage,
+                                            onDeleteServer = vpnViewModel::deleteServer,
+                                            onReplayOnboarding = vpnViewModel::replayOnboarding,
+                                            onTriggerNoInternetDemo = { isManualOfflinePreview = true }
+                                        )
 
-                                2 -> ProfileScreen(
-                                    operatorName = operatorName,
-                                    operatorUid = operatorUid,
-                                    avatarFilePath = avatarFilePath,
-                                    isEnglish = isEnglish,
-                                    isDarkTheme = isDarkTheme,
-                                    onUpdateOperatorName = vpnViewModel::updateOperatorName,
-                                    onPickAvatarUri = { uri -> vpnViewModel.saveOperatorAvatar(context, uri) },
-                                    onToggleTheme = vpnViewModel::toggleTheme,
-                                    onToggleLanguage = vpnViewModel::toggleLanguage,
-                                    onReplayOnboarding = vpnViewModel::replayOnboarding,
-                                    onPreviewNoInternet = { isManualOfflinePreview = true },
-                                    onCopiedMessage = vpnViewModel::showMessage
-                                )
+                                        1 -> ServersScreen(
+                                            servers = filteredServers,
+                                            allServers = allServers,
+                                            selectedServerId = selectedServer?.id,
+                                            searchQuery = searchQuery,
+                                            selectedFilter = selectedFilter,
+                                            isEnglish = isEnglish,
+                                            isPingingAll = isPingingAll,
+                                            pingingServerIds = pingingServerIds,
+                                            onBackClick = {
+                                                pagerScope.launch {
+                                                    pagerState.animateScrollToPage(
+                                                        0,
+                                                        animationSpec = tween(320, easing = FastOutSlowInEasing)
+                                                    )
+                                                }
+                                            },
+                                            onSearchChange = vpnViewModel::setSearchQuery,
+                                            onFilterChange = vpnViewModel::setFilter,
+                                            onSelectServer = { srv ->
+                                                vpnViewModel.selectServer(srv, context)
+                                            },
+                                            onToggleFavorite = vpnViewModel::toggleFavorite,
+                                            onPingServer = vpnViewModel::pingSingleServer,
+                                            onPingAll = vpnViewModel::pingAllServers,
+                                            onAddServerClick = {
+                                                editingServer = null
+                                                showAddOrEditDialog = true
+                                            },
+                                            onDeleteServerClick = vpnViewModel::deleteServer,
+                                            onOpenXrayConfig = { srv -> inspectingXrayServer = srv },
+                                            onImportSubscriptionText = vpnViewModel::importSubscriptionOrUri,
+                                            onToggleEuropePack = vpnViewModel::toggleEuropeSubscriptionPack,
+                                            onCopiedMessage = vpnViewModel::showMessage
+                                        )
+
+                                        2 -> ProfileScreen(
+                                            operatorName = operatorName,
+                                            operatorUsername = operatorUsername,
+                                            operatorEmail = operatorEmail,
+                                            operatorUid = operatorUid,
+                                            avatarFilePath = avatarFilePath,
+                                            isEnglish = isEnglish,
+                                            isDarkTheme = isDarkTheme,
+                                            onUpdateOperatorName = vpnViewModel::updateOperatorName,
+                                            onPickAvatarUri = { uri -> vpnViewModel.saveOperatorAvatar(context, uri) },
+                                            onToggleTheme = vpnViewModel::toggleTheme,
+                                            onToggleLanguage = vpnViewModel::toggleLanguage,
+                                            onReplayOnboarding = vpnViewModel::replayOnboarding,
+                                            onPreviewNoInternet = { isManualOfflinePreview = true },
+                                            onCopiedMessage = vpnViewModel::showMessage
+                                        )
+                                    }
+                                }
                             }
 
-                            // Floating 3-Icon Capsule Bottom Bar
+                            // Full-width Apple iOS / SwiftUI Blur TabBar
                             Surface(
                                 modifier = Modifier
                                     .align(Alignment.BottomCenter)
-                                    .navigationBarsPadding()
-                                    .padding(bottom = 14.dp)
-                                    .width(228.dp)
-                                    .height(62.dp)
-                                    .shadow(
-                                        elevation = 16.dp,
-                                        shape = RoundedCornerShape(50),
-                                        ambientColor = Color.Black.copy(alpha = 0.25f)
-                                    )
-                                    .border(1.dp, colors.border, RoundedCornerShape(50)),
-                                shape = RoundedCornerShape(50),
-                                color = colors.card.copy(alpha = 0.96f)
+                                    .fillMaxWidth()
+                                    .border(width = 0.5.dp, color = Color(0x1FFFFFFF), shape = RoundedCornerShape(topStart = 0.dp, topEnd = 0.dp)),
+                                color = Color(0xEB121214)
                             ) {
                                 Row(
                                     modifier = Modifier
-                                        .fillMaxSize()
-                                        .padding(6.dp),
-                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                        .fillMaxWidth()
+                                        .navigationBarsPadding()
+                                        .height(58.dp)
+                                        .padding(horizontal = 16.dp),
+                                    horizontalArrangement = Arrangement.SpaceAround,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    floatingTabs.forEachIndexed { idx, item ->
-                                        val isSelected = currentTab == idx
-                                        Box(
+                                    bottomTabs.forEachIndexed { idx, item ->
+                                        val isSelected = pagerState.targetPage == idx
+                                        val itemTint by animateColorAsState(
+                                            targetValue = if (isSelected) Color(0xFFFFFFFF) else Color(0xFF8E8E93),
+                                            animationSpec = tween(180),
+                                            label = "apple_tab_tint_$idx"
+                                        )
+
+                                        Column(
                                             modifier = Modifier
                                                 .weight(1f)
-                                                .height(50.dp)
-                                                .clip(RoundedCornerShape(50))
-                                                .background(
-                                                    if (isSelected) colors.primaryInk else Color.Transparent
-                                                )
-                                                .clickable { currentTab = idx }
+                                                .clip(RoundedCornerShape(12.dp))
+                                                .clickable {
+                                                    pagerScope.launch {
+                                                        pagerState.animateScrollToPage(
+                                                            idx,
+                                                            animationSpec = tween(300, easing = FastOutSlowInEasing)
+                                                        )
+                                                    }
+                                                }
+                                                .padding(vertical = 4.dp)
                                                 .testTag(item.tag),
-                                            contentAlignment = Alignment.Center
+                                            horizontalAlignment = Alignment.CenterHorizontally,
+                                            verticalArrangement = Arrangement.Center
                                         ) {
                                             Icon(
                                                 imageVector = item.icon,
-                                                contentDescription = item.contentDescription,
-                                                tint = if (isSelected) colors.onPrimaryInk else colors.secondaryText,
+                                                contentDescription = if (isEnglish) item.labelEn else item.labelRu,
+                                                tint = itemTint,
                                                 modifier = Modifier.size(22.dp)
+                                            )
+                                            Spacer(modifier = Modifier.height(3.dp))
+                                            Text(
+                                                text = if (isEnglish) item.labelEn else item.labelRu,
+                                                fontFamily = PlusJakartaFontFamily,
+                                                fontWeight = if (isSelected) FontWeight.SemiBold else FontWeight.Normal,
+                                                fontSize = 10.5.sp,
+                                                letterSpacing = (-0.2).sp,
+                                                color = itemTint,
+                                                maxLines = 1
                                             )
                                         }
                                     }
@@ -404,7 +536,104 @@ fun AstralRootApp(vpnViewModel: VpnViewModel) {
                 }
             }
 
-            // Animated "No internet connection" Overlay (triggers automatically when offline or via header toggle)
+            // T-Bank / iOS Top Floating Notification Island ("Подключаемся", "Подключено", or notifications)
+            val isIslandVisible = connectionStatus == VpnConnectionStatus.CONNECTING ||
+                showConnectedBanner ||
+                !islandMessage.isNullOrBlank()
+
+            AnimatedVisibility(
+                visible = isIslandVisible,
+                enter = slideInVertically(
+                    animationSpec = tween(280, easing = FastOutSlowInEasing),
+                    initialOffsetY = { -it * 2 }
+                ) + fadeIn(tween(220)),
+                exit = slideOutVertically(
+                    animationSpec = tween(240, easing = FastOutSlowInEasing),
+                    targetOffsetY = { -it * 2 }
+                ) + fadeOut(tween(180)),
+                modifier = Modifier
+                    .align(Alignment.TopCenter)
+                    .padding(top = 8.dp)
+            ) {
+                val activeNodeTitle = selectedServer?.displayTitle(isEnglish)
+                    ?: allServers.firstOrNull()?.displayTitle(isEnglish)
+                    ?: "VLESS"
+                val displayLabel = when {
+                    !islandMessage.isNullOrBlank() -> islandMessage.orEmpty()
+                    connectionStatus == VpnConnectionStatus.CONNECTING ->
+                        if (isEnglish) "Connecting..." else "Подключаемся"
+                    showConnectedBanner ->
+                        if (isEnglish) "Connected • $activeNodeTitle" else "Подключено • $activeNodeTitle"
+                    else -> ""
+                }
+
+                Surface(
+                    modifier = Modifier
+                        .widthIn(min = 160.dp, max = 330.dp)
+                        .shadow(
+                            elevation = 16.dp,
+                            shape = RoundedCornerShape(50),
+                            ambientColor = Color.Black.copy(alpha = 0.35f)
+                        )
+                        .border(1.dp, colors.border, RoundedCornerShape(50))
+                        .clickable {
+                            islandMessage = null
+                            showConnectedBanner = false
+                        },
+                    shape = RoundedCornerShape(50),
+                    color = colors.cardElevated
+                ) {
+                    Row(
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 9.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        if (connectionStatus == VpnConnectionStatus.CONNECTING && islandMessage.isNullOrBlank()) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(14.dp),
+                                strokeWidth = 1.8.dp,
+                                color = colors.primaryInk
+                            )
+                        } else if (showConnectedBanner && islandMessage.isNullOrBlank()) {
+                            Icon(
+                                imageVector = Icons.Default.CheckCircle,
+                                contentDescription = null,
+                                tint = colors.primaryInk,
+                                modifier = Modifier.size(15.dp)
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(colors.primaryInk.copy(alpha = 0.12f)),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Default.Notifications,
+                                    contentDescription = null,
+                                    tint = colors.primaryInk,
+                                    modifier = Modifier.size(13.dp)
+                                )
+                            }
+                        }
+
+                        Spacer(modifier = Modifier.width(8.dp))
+
+                        Text(
+                            text = displayLabel,
+                            fontFamily = PlusJakartaFontFamily,
+                            fontWeight = FontWeight.SemiBold,
+                            fontSize = 13.sp,
+                            color = colors.primaryInk,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                }
+            }
+
+            // Animated "No internet connection" Overlay
             AnimatedVisibility(
                 visible = isSystemOffline || isManualOfflinePreview,
                 enter = fadeIn(tween(200)),

@@ -194,20 +194,26 @@ data class VlessServerEntity(
 
     private fun stripLeadingFlags(input: String): String {
         var text = input.trim()
-        if (flagEmoji.isNotBlank() && text.startsWith(flagEmoji)) {
-            text = text.removePrefix(flagEmoji).trim()
+        if (flagEmoji.isNotBlank()) {
+            text = text.replace(flagEmoji, "").trim()
         }
-        // Also strip any leading Unicode Regional Indicator pair (flag emoji)
-        var idx = 0
-        while (idx < text.length) {
-            val cp = text.codePointAt(idx)
-            if (cp in 0x1F1E6..0x1F1FF || Character.isWhitespace(cp)) {
-                idx += Character.charCount(cp)
-            } else {
-                break
+        val sb = StringBuilder()
+        var i = 0
+        while (i < text.length) {
+            val cp = text.codePointAt(i)
+            val charCount = Character.charCount(cp)
+            val isEmojiOrVariation = cp in 0x1F1E6..0x1F1FF ||
+                cp in 0x1F300..0x1FAFF ||
+                cp in 0x2600..0x27BF ||
+                cp == 0xFE0F ||
+                cp == 0xFE0E ||
+                cp == 0x200D
+            if (!isEmojiOrVariation) {
+                sb.appendCodePoint(cp)
             }
+            i += charCount
         }
-        return text.substring(idx).trim()
+        return sb.toString().replace(Regex("\\s+"), " ").trim()
     }
 
     val protocolBadge: String

@@ -74,6 +74,8 @@ fun ProfileScreen(
     avatarFilePath: String?,
     isEnglish: Boolean,
     isDarkTheme: Boolean,
+    operatorUsername: String = "bush_user",
+    operatorEmail: String = "user@bushvpn.io",
     onUpdateOperatorName: (String) -> Unit,
     onPickAvatarUri: (android.net.Uri) -> Unit,
     onToggleTheme: () -> Unit,
@@ -265,6 +267,16 @@ fun ProfileScreen(
                             }
                         }
 
+                        Spacer(modifier = Modifier.height(4.dp))
+
+                        Text(
+                            text = "@${operatorUsername.removePrefix("@")}  •  $operatorEmail",
+                            fontFamily = JetBrainsMonoFontFamily,
+                            fontWeight = FontWeight.Medium,
+                            fontSize = 12.sp,
+                            color = colors.secondaryText
+                        )
+
                         Spacer(modifier = Modifier.height(8.dp))
 
                         Row(
@@ -298,6 +310,51 @@ fun ProfileScreen(
                             )
                         }
                     }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // NoteVault Account / Registration Replay Card
+            Surface(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(22.dp))
+                    .clickable(onClick = onReplayOnboarding)
+                    .border(1.dp, colors.border, RoundedCornerShape(22.dp)),
+                color = colors.card,
+                shape = RoundedCornerShape(22.dp)
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(horizontal = 20.dp, vertical = 16.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Column {
+                        Text(
+                            text = if (isEnglish) "ACCOUNT & ONBOARDING" else "АККАУНТ И РЕГИСТРАЦИЯ",
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 11.sp,
+                            letterSpacing = 1.3.sp,
+                            color = colors.secondaryText
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = if (isEnglish) "Change Email / @Username / Language" else "Изменить почту, @юзернейм и язык",
+                            fontFamily = PlusJakartaFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 15.sp,
+                            color = colors.primaryInk
+                        )
+                    }
+                    NoteVaultFlowerIcon(
+                        size = 24.dp,
+                        color = colors.primaryInk,
+                        strokeWidthDp = 2.0.dp
+                    )
                 }
             }
 

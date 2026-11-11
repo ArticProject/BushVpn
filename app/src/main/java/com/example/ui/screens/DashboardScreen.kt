@@ -1,14 +1,18 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
@@ -30,12 +34,14 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.LightMode
 import androidx.compose.material.icons.filled.WifiOff
+import com.example.ui.components.iosBounceClickable
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Surface
@@ -48,9 +54,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -58,7 +66,9 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.VlessParser
@@ -66,6 +76,7 @@ import com.example.data.VlessServerEntity
 import com.example.data.VpnTunnelSettings
 import com.example.ui.CoreLogEntry
 import com.example.ui.VpnConnectionStatus
+import com.example.ui.components.CountryFlagSquare
 import com.example.ui.components.IncySettingsGearIcon
 import com.example.ui.components.MonochromeFistIcon
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -73,9 +84,6 @@ import com.example.ui.theme.LocalAstralColors
 import com.example.ui.theme.PlusJakartaFontFamily
 import com.example.ui.theme.SpaceGroteskFontFamily
 import java.util.Locale
-import kotlin.math.PI
-import kotlin.math.cos
-import kotlin.math.sin
 
 @Composable
 fun DashboardScreen(
@@ -103,6 +111,7 @@ fun DashboardScreen(
     onImportSubscriptionText: (String) -> Unit = {},
     onCopiedMessage: (String) -> Unit = {},
     onDeleteServer: (VlessServerEntity) -> Unit = {},
+    onToggleFavorite: (VlessServerEntity) -> Unit = {},
     onReplayOnboarding: () -> Unit = {},
     onTriggerNoInternetDemo: () -> Unit
 ) {
@@ -122,24 +131,56 @@ fun DashboardScreen(
     }
     val providerCount = groupedProviders.size.coerceAtLeast(1)
 
-    val infiniteTransition = rememberInfiniteTransition(label = "tactile_orb_transition")
-    val sweepPhase by infiniteTransition.animateFloat(
+    val infiniteTransition = rememberInfiniteTransition(label = "cosmic_orb_transition")
+    val orbitAngle by infiniteTransition.animateFloat(
         initialValue = 0f,
-        targetValue = 1f,
+        targetValue = 360f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2200, easing = LinearEasing),
+            animation = tween(3200, easing = LinearEasing),
             repeatMode = RepeatMode.Restart
         ),
-        label = "sweepPhase"
+        label = "orbitAngle"
     )
-    val pulseRadiusFactor by infiniteTransition.animateFloat(
-        initialValue = 1.0f,
-        targetValue = 1.18f,
+    val breathProgress by infiniteTransition.animateFloat(
+        initialValue = 0.94f,
+        targetValue = 1.08f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000, easing = FastOutSlowInEasing),
+            animation = tween(2400, easing = FastOutSlowInEasing),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "pulseRadiusFactor"
+        label = "breathProgress"
+    )
+
+    val isActive = connectionStatus != VpnConnectionStatus.DISCONNECTED
+    val buttonScale by animateFloatAsState(
+        targetValue = when (connectionStatus) {
+            VpnConnectionStatus.DISCONNECTED -> 1.0f
+            VpnConnectionStatus.CONNECTING -> 0.96f
+            VpnConnectionStatus.CONNECTED -> 1.03f
+        },
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessLow
+        ),
+        label = "buttonScale"
+    )
+    val coreBgColor by animateColorAsState(
+        targetValue = if (connectionStatus == VpnConnectionStatus.CONNECTED) {
+            colors.primaryInk
+        } else {
+            colors.cardElevated
+        },
+        animationSpec = tween(280),
+        label = "coreBgColor"
+    )
+    val coreContentColor by animateColorAsState(
+        targetValue = if (connectionStatus == VpnConnectionStatus.CONNECTED) {
+            colors.onPrimaryInk
+        } else {
+            colors.primaryInk
+        },
+        animationSpec = tween(280),
+        label = "coreContentColor"
     )
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -152,32 +193,34 @@ fun DashboardScreen(
         ) {
             Spacer(modifier = Modifier.height(12.dp))
 
-            // Top Header Bar: Monochrome Fist + BUSH VPN on left | Settings + Offline Demo + Theme on right
+            // Top Header Bar: Left has Fist + BUSH VPN 2.0 AND Settings Gear underneath on the left; Right has Offline + Theme
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                verticalAlignment = Alignment.Top
             ) {
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    MonochromeFistIcon(
-                        color = colors.primaryInk,
-                        size = 24.dp
-                    )
-                    Spacer(modifier = Modifier.width(10.dp))
-                    Text(
-                        text = "BUSH VPN 2.0",
-                        fontFamily = SpaceGroteskFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 22.sp,
-                        letterSpacing = 0.6.sp,
-                        color = colors.primaryInk
-                    )
-                }
+                Column(horizontalAlignment = Alignment.Start) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        NoteVaultFlowerIcon(
+                            size = 25.dp,
+                            color = colors.primaryInk,
+                            rotationDegrees = orbitAngle * 0.2f,
+                            strokeWidthDp = 2.0.dp
+                        )
+                        Spacer(modifier = Modifier.width(10.dp))
+                        Text(
+                            text = "BushVPN",
+                            fontFamily = SpaceGroteskFontFamily,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 23.sp,
+                            letterSpacing = (-0.3).sp,
+                            color = colors.primaryInk
+                        )
+                    }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    // Settings Gear Button on the left directly under the BUSH VPN title
                     Surface(
                         modifier = Modifier
                             .size(38.dp)
@@ -195,7 +238,12 @@ fun DashboardScreen(
                             )
                         }
                     }
+                }
 
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
                     IconButton(
                         onClick = onTriggerNoInternetDemo,
                         modifier = Modifier
@@ -232,84 +280,82 @@ fun DashboardScreen(
                 }
             }
 
-            Spacer(modifier = Modifier.height(14.dp))
+            Spacer(modifier = Modifier.height(6.dp))
 
-            // Sculptural Tactile Multi-Ring Connect Button (Happ / Incy Pro style)
+            // Pure Monochrome iOS / T-Bank Connect Button (White/Black inversion on connection)
             Column(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Box(
-                    modifier = Modifier.size(216.dp),
+                    modifier = Modifier.size(210.dp),
                     contentAlignment = Alignment.Center
                 ) {
-                    // Layer 1: Precision 48-Tick Radial Dial & Subtle Pulse Ring
+                    // Layer 1: Monochrome Radial Glow & Orbital Ring
                     Canvas(modifier = Modifier.fillMaxSize()) {
-                        val cx = size.width / 2f
-                        val cy = size.height / 2f
-                        val tickCount = 48
-                        val innerTickR = 90.dp.toPx()
-                        val outerTickR = 98.dp.toPx()
+                        val centerOffset = Offset(size.width / 2f, size.height / 2f)
+                        val maxRadius = (size.minDimension / 2f) * breathProgress
 
-                        if (connectionStatus == VpnConnectionStatus.CONNECTED) {
-                            drawCircle(
-                                color = colors.primaryInk.copy(alpha = 0.08f),
-                                radius = 84.dp.toPx() * pulseRadiusFactor,
-                                center = Offset(cx, cy)
-                            )
+                        val glowAlpha = when (connectionStatus) {
+                            VpnConnectionStatus.CONNECTED -> 0.14f
+                            VpnConnectionStatus.CONNECTING -> 0.10f
+                            VpnConnectionStatus.DISCONNECTED -> 0.04f
                         }
 
-                        for (i in 0 until tickCount) {
-                            val fraction = i.toFloat() / tickCount.toFloat()
-                            val angleRad = (fraction * 2f * PI.toFloat()) - (PI.toFloat() / 2f)
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                colors = listOf(colors.primaryInk.copy(alpha = glowAlpha), Color.Transparent),
+                                center = centerOffset,
+                                radius = maxRadius
+                            ),
+                            radius = maxRadius,
+                            center = centerOffset
+                        )
 
-                            val tickAlpha = when (connectionStatus) {
-                                VpnConnectionStatus.DISCONNECTED -> {
-                                    val wave = ((sin((fraction - sweepPhase) * 2f * PI.toFloat()) + 1f) * 0.5f)
-                                    0.12f + 0.14f * wave
-                                }
-                                VpnConnectionStatus.CONNECTING -> {
-                                    val dist = ((fraction - sweepPhase + 1f) % 1f)
-                                    if (dist < 0.35f) 0.18f + (1f - dist / 0.35f) * 0.78f else 0.14f
-                                }
-                                VpnConnectionStatus.CONNECTED -> {
-                                    val wave = ((sin((fraction - sweepPhase) * 2f * PI.toFloat()) + 1f) * 0.5f)
-                                    0.35f + 0.55f * wave
-                                }
-                            }
+                        // Soft outer ring halo
+                        drawCircle(
+                            color = colors.border.copy(alpha = 0.65f),
+                            radius = 90.dp.toPx() * (0.98f + (breathProgress - 1f) * 0.30f),
+                            center = centerOffset,
+                            style = Stroke(width = 1.dp.toPx())
+                        )
 
-                            val tickColor = if (connectionStatus == VpnConnectionStatus.CONNECTED && i % 4 == 0) {
-                                colors.activeGreen.copy(alpha = tickAlpha)
-                            } else {
-                                colors.primaryInk.copy(alpha = tickAlpha)
-                            }
-
-                            val startX = cx + cos(angleRad) * innerTickR
-                            val startY = cy + sin(angleRad) * innerTickR
-                            val endX = cx + cos(angleRad) * outerTickR
-                            val endY = cy + sin(angleRad) * outerTickR
-
-                            drawLine(
-                                color = tickColor,
-                                start = Offset(startX, startY),
-                                end = Offset(endX, endY),
-                                strokeWidth = 2.dp.toPx(),
-                                cap = StrokeCap.Round
+                        if (connectionStatus == VpnConnectionStatus.CONNECTING) {
+                            drawArc(
+                                color = colors.primaryInk.copy(alpha = 0.82f),
+                                startAngle = orbitAngle,
+                                sweepAngle = 115f,
+                                useCenter = false,
+                                topLeft = Offset(
+                                    centerOffset.x - 84.dp.toPx(),
+                                    centerOffset.y - 84.dp.toPx()
+                                ),
+                                size = Size(168.dp.toPx(), 168.dp.toPx()),
+                                style = Stroke(width = 2.2.dp.toPx(), cap = StrokeCap.Round)
+                            )
+                        } else if (connectionStatus == VpnConnectionStatus.CONNECTED) {
+                            drawCircle(
+                                color = colors.primaryInk.copy(alpha = 0.42f),
+                                radius = 84.dp.toPx(),
+                                center = centerOffset,
+                                style = Stroke(width = 1.5.dp.toPx())
                             )
                         }
                     }
 
-                    // Layer 2: Tactile Outer Bezel Ring (168.dp)
+                    // Layer 2: Soft-Matte Monochrome Cushion Ring (164.dp)
                     Surface(
                         modifier = Modifier
-                            .size(168.dp)
+                            .size(164.dp)
+                            .scale(buttonScale)
                             .shadow(
-                                elevation = 12.dp,
+                                elevation = 16.dp,
                                 shape = CircleShape,
-                                ambientColor = Color.Black.copy(alpha = 0.16f)
+                                ambientColor = Color.Black.copy(alpha = 0.26f),
+                                spotColor = Color.Black.copy(alpha = 0.26f)
                             )
                             .border(
-                                width = 1.2.dp,
+                                width = 1.dp,
                                 color = if (connectionStatus == VpnConnectionStatus.CONNECTED) {
                                     colors.primaryInk.copy(alpha = 0.45f)
                                 } else {
@@ -321,58 +367,57 @@ fun DashboardScreen(
                         color = colors.card
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            // Layer 3: Inner Core Power Button (134.dp)
-                            val isActive = connectionStatus != VpnConnectionStatus.DISCONNECTED
+                            // Layer 3: Monochrome Core Button (White when connected, Soft Dark when disconnected)
                             Surface(
                                 modifier = Modifier
-                                    .size(134.dp)
+                                    .size(132.dp)
                                     .clip(CircleShape)
                                     .clickable(onClick = onToggleConnection)
                                     .border(
-                                        width = if (isActive) 2.dp else 1.8.dp,
-                                        color = colors.primaryInk,
+                                        width = 1.2.dp,
+                                        color = if (isActive) {
+                                            colors.primaryInk
+                                        } else {
+                                            colors.border
+                                        },
                                         shape = CircleShape
                                     )
                                     .testTag("vpn_connect_orb"),
                                 shape = CircleShape,
-                                color = if (isActive) colors.primaryInk else colors.surface
+                                color = coreBgColor
                             ) {
                                 Column(
                                     modifier = Modifier.fillMaxSize(),
                                     horizontalAlignment = Alignment.CenterHorizontally,
                                     verticalArrangement = Arrangement.Center
                                 ) {
-                                    val emblemColor = if (isActive) colors.onPrimaryInk else colors.primaryInk
-
-                                    // Crisp Custom Drawn Power Emblem
-                                    Canvas(modifier = Modifier.size(38.dp)) {
+                                    // Monochrome Power Glyph
+                                    Canvas(modifier = Modifier.size(34.dp)) {
                                         val w = size.width
                                         val h = size.height
-                                        val strokeW = 2.8.dp.toPx()
+                                        val strokeW = 2.5.dp.toPx()
                                         val pad = w * 0.16f
 
-                                        // Power arc (300 degrees, open at top)
                                         drawArc(
-                                            color = emblemColor,
-                                            startAngle = -60f,
-                                            sweepAngle = 300f,
+                                            color = coreContentColor,
+                                            startAngle = -58f,
+                                            sweepAngle = 296f,
                                             useCenter = false,
                                             topLeft = Offset(pad, pad + h * 0.04f),
                                             size = Size(w - pad * 2f, h - pad * 2f),
                                             style = Stroke(width = strokeW, cap = StrokeCap.Round)
                                         )
 
-                                        // Vertical top power stem
                                         drawLine(
-                                            color = emblemColor,
+                                            color = coreContentColor,
                                             start = Offset(w / 2f, h * 0.10f),
-                                            end = Offset(w / 2f, h * 0.48f),
+                                            end = Offset(w / 2f, h * 0.46f),
                                             strokeWidth = strokeW,
                                             cap = StrokeCap.Round
                                         )
                                     }
 
-                                    Spacer(modifier = Modifier.height(8.dp))
+                                    Spacer(modifier = Modifier.height(10.dp))
 
                                     Text(
                                         text = when (connectionStatus) {
@@ -383,8 +428,8 @@ fun DashboardScreen(
                                         fontFamily = SpaceGroteskFontFamily,
                                         fontWeight = FontWeight.Bold,
                                         fontSize = 11.5.sp,
-                                        letterSpacing = 1.2.sp,
-                                        color = emblemColor
+                                        letterSpacing = 1.1.sp,
+                                        color = coreContentColor
                                     )
                                 }
                             }
@@ -392,54 +437,84 @@ fun DashboardScreen(
                     }
                 }
 
-                // Active Country & Status Pill right below the Connect Orb
+                // Apple iOS Squircle Server Selection Card (18-20px radius, #1C1C1E, ping, chevron)
                 if (activeNode != null) {
-                    Spacer(modifier = Modifier.height(6.dp))
+                    Spacer(modifier = Modifier.height(14.dp))
                     Surface(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(50))
-                            .clickable { onPingServer(activeNode) }
-                            .border(1.dp, colors.border, RoundedCornerShape(50)),
-                        color = colors.card,
-                        shape = RoundedCornerShape(50)
+                            .fillMaxWidth()
+                            .padding(horizontal = 4.dp)
+                            .clip(RoundedCornerShape(19.dp))
+                            .border(1.dp, Color(0x14FFFFFF), RoundedCornerShape(19.dp))
+                            .iosBounceClickable(onClick = onOpenServerList)
+                            .testTag("dashboard_selected_server_card"),
+                        color = Color(0xFF1C1C1E),
+                        shape = RoundedCornerShape(19.dp)
                     ) {
                         Row(
-                            modifier = Modifier.padding(horizontal = 14.dp, vertical = 7.dp),
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp, vertical = 14.dp),
                             verticalAlignment = Alignment.CenterVertically
                         ) {
-                            Box(
-                                modifier = Modifier
-                                    .size(7.dp)
-                                    .clip(CircleShape)
-                                    .background(
-                                        if (connectionStatus == VpnConnectionStatus.CONNECTED) {
-                                            colors.activeGreen
-                                        } else {
-                                            colors.primaryInk.copy(alpha = 0.45f)
-                                        }
+                            CountryFlagSquare(
+                                countryCode = activeNode.countryCode,
+                                size = 26.dp,
+                                cornerRadius = 7.dp,
+                                isSelected = false
+                            )
+
+                            Spacer(modifier = Modifier.width(14.dp))
+
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = if (isEnglish) "Connected Server" else "Текущий сервер",
+                                    fontFamily = PlusJakartaFontFamily,
+                                    fontSize = 11.5.sp,
+                                    color = Color(0xFF8E8E93),
+                                    fontWeight = FontWeight.Medium
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = activeNode.displayTitle(isEnglish),
+                                    fontFamily = PlusJakartaFontFamily,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 15.sp,
+                                    color = Color(0xFFFFFFFF),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+
+                            if (activeNode.pingMs > 0) {
+                                Surface(
+                                    color = Color(0x14FFFFFF),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text(
+                                        text = "${activeNode.pingMs} ms",
+                                        fontFamily = JetBrainsMonoFontFamily,
+                                        fontWeight = FontWeight.SemiBold,
+                                        fontSize = 11.sp,
+                                        color = if (activeNode.pingMs < 80) Color(0xFF30D158) else Color(0xFFFF9F0A),
+                                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
                                     )
-                            )
-                            Spacer(modifier = Modifier.width(8.dp))
-                            Text(
-                                text = "${activeNode.flagEmoji} ${activeNode.displayTitle(isEnglish)}",
-                                fontFamily = PlusJakartaFontFamily,
-                                fontWeight = FontWeight.Bold,
-                                fontSize = 13.sp,
-                                color = colors.primaryInk
-                            )
-                            Text(
-                                text = "  •  ${activeNode.pingMs} ms",
-                                fontFamily = JetBrainsMonoFontFamily,
-                                fontWeight = FontWeight.SemiBold,
-                                fontSize = 12.sp,
-                                color = colors.secondaryText
+                                }
+                                Spacer(modifier = Modifier.width(8.dp))
+                            }
+
+                            Icon(
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                                contentDescription = "Change Server",
+                                tint = Color(0xFF8E8E93),
+                                modifier = Modifier.size(20.dp)
                             )
                         }
                     }
                 }
             }
 
-            Spacer(modifier = Modifier.height(18.dp))
+            Spacer(modifier = Modifier.height(20.dp))
 
             // Incy-Style "Servers" Header + Moved Action Buttons (^, Ping, +) right next to each other
             Row(
@@ -545,7 +620,8 @@ fun DashboardScreen(
                         onCopyNodeUri = { srv ->
                             clipboardManager.setText(AnnotatedString(VlessParser.toUri(srv)))
                             onCopiedMessage("VLESS URI скопирован")
-                        }
+                        },
+                        onToggleFavoriteNode = onToggleFavorite
                     )
                 }
             }

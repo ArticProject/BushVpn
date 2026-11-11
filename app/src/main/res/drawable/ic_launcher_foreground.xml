@@ -4,14 +4,86 @@
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <!-- 6 dark circles arranged in a symmetrical ring inside the 66dp adaptive icon safe zone -->
-    <path
-        android:fillColor="#22211F"
-        android:pathData="
-            M54,27.9 a6.6,6.6 0 1,0 0,13.2 a6.6,6.6 0 1,0 0,-13.2 Z
-            M70.89,37.65 a6.6,6.6 0 1,0 0,13.2 a6.6,6.6 0 1,0 0,-13.2 Z
-            M70.89,57.15 a6.6,6.6 0 1,0 0,13.2 a6.6,6.6 0 1,0 0,-13.2 Z
-            M54,66.9 a6.6,6.6 0 1,0 0,13.2 a6.6,6.6 0 1,0 0,-13.2 Z
-            M37.11,57.15 a6.6,6.6 0 1,0 0,13.2 a6.6,6.6 0 1,0 0,-13.2 Z
-            M37.11,37.65 a6.6,6.6 0 1,0 0,13.2 a6.6,6.6 0 1,0 0,-13.2 Z" />
+    <!-- NoteVault 6-petal flower silhouette inside the 66dp adaptive icon safe zone -->
+    <group
+        android:pivotX="54"
+        android:pivotY="54">
+        <!-- Petal 1 (0 deg) -->
+        <path
+            android:fillColor="#00000000"
+            android:strokeColor="#F4F5F8"
+            android:strokeWidth="3.4"
+            android:strokeLineCap="round"
+            android:strokeLineJoin="round"
+            android:pathData="M54,54 C46.5,43 46,27.5 54,27.5 C62,27.5 61.5,43 54,54 Z" />
+        <!-- Petal 2 (60 deg) -->
+        <group
+            android:pivotX="54"
+            android:pivotY="54"
+            android:rotation="60">
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#F4F5F8"
+                android:strokeWidth="3.4"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M54,54 C46.5,43 46,27.5 54,27.5 C62,27.5 61.5,43 54,54 Z" />
+        </group>
+        <!-- Petal 3 (120 deg) -->
+        <group
+            android:pivotX="54"
+            android:pivotY="54"
+            android:rotation="120">
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#F4F5F8"
+                android:strokeWidth="3.4"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M54,54 C46.5,43 46,27.5 54,27.5 C62,27.5 61.5,43 54,54 Z" />
+        </group>
+        <!-- Petal 4 (180 deg) -->
+        <group
+            android:pivotX="54"
+            android:pivotY="54"
+            android:rotation="180">
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#F4F5F8"
+                android:strokeWidth="3.4"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M54,54 C46.5,43 46,27.5 54,27.5 C62,27.5 61.5,43 54,54 Z" />
+        </group>
+        <!-- Petal 5 (240 deg) -->
+        <group
+            android:pivotX="54"
+            android:pivotY="54"
+            android:rotation="240">
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#F4F5F8"
+                android:strokeWidth="3.4"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M54,54 C46.5,43 46,27.5 54,27.5 C62,27.5 61.5,43 54,54 Z" />
+        </group>
+        <!-- Petal 6 (300 deg) -->
+        <group
+            android:pivotX="54"
+            android:pivotY="54"
+            android:rotation="300">
+            <path
+                android:fillColor="#00000000"
+                android:strokeColor="#F4F5F8"
+                android:strokeWidth="3.4"
+                android:strokeLineCap="round"
+                android:strokeLineJoin="round"
+                android:pathData="M54,54 C46.5,43 46,27.5 54,27.5 C62,27.5 61.5,43 54,54 Z" />
+        </group>
+        <!-- Center node -->
+        <path
+            android:fillColor="#F4F5F8"
+            android:pathData="M54,50.2 a3.8,3.8 0 1,0 0,7.6 a3.8,3.8 0 1,0 0,-7.6 Z" />
+    </group>
 </vector>

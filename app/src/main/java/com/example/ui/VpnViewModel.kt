@@ -8,11 +8,20 @@ import androidx.core.content.ContextCompat
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
+import com.example.data.AccountDao
+import com.example.data.AccountRepository
+import com.example.data.EmailCodeDispatcher
+import com.example.data.EmailDispatchResult
+import com.example.data.EmailVerificationEntity
+import com.example.data.SmtpConfig
+import com.example.data.UserAccountEntity
 import com.example.data.VlessParser
 import com.example.data.VlessServerEntity
 import com.example.data.VpnRepository
 import com.example.data.VpnTunnelSettings
 import com.example.vpn.AetherVpnService
+import com.google.firebase.Firebase
+import com.google.firebase.auth.auth
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
@@ -65,24 +74,63 @@ data class CoreLogEntry(
 
 class VpnViewModel(
     private val repository: VpnRepository,
-    private val prefs: SharedPreferences? = null
+    private val prefs: SharedPreferences? = null,
+    private val accountDao: AccountDao? = null,
+    private val accountRepository: AccountRepository? = null
 ) : ViewModel() {
 
     val allServers: StateFlow<List<VlessServerEntity>> = repository.allServers
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
-    // Launch directly into MAIN_ENCLAVE so re-entering the app never replays the Welcome/Advantages animation
-    private val _appStage = MutableStateFlow(AppStage.MAIN_ENCLAVE)
+    val recentEmailCodes: StateFlow<List<EmailVerificationEntity>> =
+        (accountDao?.observeRecentCodes() ?: kotlinx.coroutines.flow.flowOf(emptyList()))
+            .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    private val _latestVerificationCode = MutableStateFlow<String?>(null)
+    val latestVerificationCode: StateFlow<String?> = _latestVerificationCode.asStateFlow()
+
+    private val _emailDispatchResult = MutableStateFlow<EmailDispatchResult?>(null)
+    val emailDispatchResult: StateFlow<EmailDispatchResult?> = _emailDispatchResult.asStateFlow()
+
+    private val _smtpConfig = MutableStateFlow(
+        SmtpConfig(
+            host = prefs?.getString("smtp_host", "smtp.gmail.com") ?: "smtp.gmail.com",
+            port = prefs?.getInt("smtp_port", 587) ?: 587,
+            senderEmail = prefs?.getString("smtp_sender_email", "") ?: "",
+            appPassword = prefs?.getString("smtp_app_password", "") ?: ""
+        )
+    )
+    val smtpConfig: StateFlow<SmtpConfig> = _smtpConfig.asStateFlow()
+
+    private val _latestFirestoreCodeId = MutableStateFlow<String?>(null)
+
+    // Always start with the NoteVault flower splash animation (which either opens the registration flow on first run or auto-transitions to MAIN_ENCLAVE)
+    private val _appStage = MutableStateFlow(AppStage.WELCOME)
     val appStage: StateFlow<AppStage> = _appStage.asStateFlow()
 
-    private val _isDarkTheme = MutableStateFlow(prefs?.getBoolean("is_dark_theme", false) ?: false)
+    private val _isRegistrationCompleted = MutableStateFlow(
+        prefs?.getBoolean("notevault_auth_email_code_v2", false) ?: false
+    )
+    val isRegistrationCompleted: StateFlow<Boolean> = _isRegistrationCompleted.asStateFlow()
+
+    private val _isDarkTheme = MutableStateFlow(prefs?.getBoolean("is_dark_theme_v2", true) ?: true)
     val isDarkTheme: StateFlow<Boolean> = _isDarkTheme.asStateFlow()
 
     private val _isEnglish = MutableStateFlow(prefs?.getBoolean("is_english", false) ?: false)
     val isEnglish: StateFlow<Boolean> = _isEnglish.asStateFlow()
 
+    private val _operatorEmail = MutableStateFlow(
+        prefs?.getString("operator_email", "user@bushvpn.io") ?: "user@bushvpn.io"
+    )
+    val operatorEmail: StateFlow<String> = _operatorEmail.asStateFlow()
+
     private val _operatorName = MutableStateFlow(prefs?.getString("operator_name", "user") ?: "user")
     val operatorName: StateFlow<String> = _operatorName.asStateFlow()
+
+    private val _operatorUsername = MutableStateFlow(
+        prefs?.getString("operator_username", "bush_user") ?: "bush_user"
+    )
+    val operatorUsername: StateFlow<String> = _operatorUsername.asStateFlow()
 
     private val _operatorUid = MutableStateFlow("#9E29A")
     val operatorUid: StateFlow<String> = _operatorUid.asStateFlow()
@@ -279,7 +327,157 @@ class VpnViewModel(
     }
 
     fun goToAdvantages() {
-        _appStage.value = AppStage.ADVANTAGES
+        prefs?.edit()?.putBoolean("onboarding_v2_shown", true)?.apply()
+        _appStage.value = AppStage.MAIN_ENCLAVE
+    }
+
+    fun saveSmtpConfig(config: SmtpConfig) {
+        _smtpConfig.value = config
+        prefs?.edit()
+            ?.putString("smtp_host", config.host.trim())
+            ?.putInt("smtp_port", config.port)
+            ?.putString("smtp_sender_email", config.senderEmail.trim())
+            ?.putString("smtp_app_password", config.appPassword.trim())
+            ?.apply()
+        showMessage(
+            if (_isEnglish.value) {
+                "SMTP saved (${config.senderEmail})"
+            } else {
+                "SMTP сохранен (${config.senderEmail})"
+            }
+        )
+    }
+
+    fun sendEmailVerificationCode(
+        @Suppress("UNUSED_PARAMETER") context: Context,
+        email: String,
+        onCodeSent: (String) -> Unit = {}
+    ) {
+        val cleanEmail = email.trim().ifBlank { "user@bushvpn.io" }
+        val code = EmailCodeDispatcher.generateSixDigitCode()
+        _latestVerificationCode.value = code
+        _operatorEmail.value = cleanEmail
+        _emailDispatchResult.value = null
+
+        viewModelScope.launch {
+            withContext(Dispatchers.IO) {
+                accountDao?.insertVerificationCode(
+                    EmailVerificationEntity(
+                        email = cleanEmail,
+                        code = code,
+                        verified = false
+                    )
+                )
+                val firebaseUser = runCatching { Firebase.auth.currentUser }.getOrNull()
+                if (firebaseUser != null) {
+                    accountRepository?.createVerificationCode(cleanEmail, code)?.onSuccess { docId ->
+                        _latestFirestoreCodeId.value = docId
+                    }
+                }
+            }
+            val result = EmailCodeDispatcher.dispatchVerificationEmail(
+                recipientEmail = cleanEmail,
+                code = code,
+                isEnglish = _isEnglish.value,
+                smtpConfig = _smtpConfig.value
+            )
+            _emailDispatchResult.value = result
+            showMessage(
+                if (result.delivered) {
+                    if (_isEnglish.value) {
+                        "📩 Verification email sent to $cleanEmail"
+                    } else {
+                        "📩 Письмо с кодом отправлено на $cleanEmail"
+                    }
+                } else if (result.needsFormActivation) {
+                    if (_isEnglish.value) {
+                        "📩 Activation email sent to $cleanEmail (check Inbox/Spam)"
+                    } else {
+                        "📩 Письмо активации отправлено на $cleanEmail (проверьте Почту/Спам)"
+                    }
+                } else {
+                    if (_isEnglish.value) {
+                        "Configure SMTP to send directly to $cleanEmail"
+                    } else {
+                        "Настройте SMTP для прямой отправки на $cleanEmail"
+                    }
+                }
+            )
+            onCodeSent(code)
+        }
+    }
+
+    fun verifyEmailCode(
+        email: String,
+        enteredCode: String,
+        onResult: (Boolean) -> Unit
+    ) {
+        val cleanEmail = email.trim().ifBlank { _operatorEmail.value }
+        val cleanEntered = enteredCode.trim()
+        viewModelScope.launch {
+            val isValid = withContext(Dispatchers.IO) {
+                val dbEntry = accountDao?.getLatestCodeForEmail(cleanEmail)
+                val expected = dbEntry?.code ?: _latestVerificationCode.value
+                val match = !expected.isNullOrBlank() && expected == cleanEntered
+                if (match) {
+                    if (dbEntry != null) {
+                        accountDao?.markCodeVerified(dbEntry.id)
+                    }
+                    val fsId = _latestFirestoreCodeId.value
+                    val firebaseUser = runCatching { Firebase.auth.currentUser }.getOrNull()
+                    if (firebaseUser != null && !fsId.isNullOrBlank()) {
+                        accountRepository?.markCodeVerified(fsId)
+                    }
+                }
+                match
+            }
+            onResult(isValid)
+        }
+    }
+
+    fun completeRegistration(email: String, name: String, username: String, langCode: String) {
+        val cleanEmail = email.trim().ifBlank { "user@bushvpn.io" }
+        val cleanName = name.trim().ifBlank { "Operator" }
+        val cleanUser = username.trim().removePrefix("@").lowercase().ifBlank { "bush_user" }
+        val useEnglish = langCode != "ru" && langCode != "uk"
+
+        _operatorEmail.value = cleanEmail
+        _operatorName.value = cleanName
+        _operatorUsername.value = cleanUser
+        _isEnglish.value = useEnglish
+        _isRegistrationCompleted.value = true
+
+        prefs?.edit()
+            ?.putString("operator_email", cleanEmail)
+            ?.putString("operator_name", cleanName)
+            ?.putString("operator_username", cleanUser)
+            ?.putBoolean("is_english", useEnglish)
+            ?.putBoolean("notevault_auth_email_code_v2", true)
+            ?.putBoolean("onboarding_v2_shown", true)
+            ?.apply()
+
+        viewModelScope.launch(Dispatchers.IO) {
+            accountDao?.upsertAccount(
+                UserAccountEntity(
+                    email = cleanEmail,
+                    name = cleanName,
+                    username = cleanUser,
+                    passwordHash = "verified_sha256",
+                    emailVerified = true
+                )
+            )
+            val firebaseUser = runCatching { Firebase.auth.currentUser }.getOrNull()
+            if (firebaseUser != null) {
+                accountRepository?.saveUserAccount(
+                    email = cleanEmail,
+                    name = cleanName,
+                    username = cleanUser,
+                    emailVerified = true
+                )
+            }
+        }
+
+        _appStage.value = AppStage.MAIN_ENCLAVE
     }
 
     fun backToWelcome() {
@@ -287,27 +485,24 @@ class VpnViewModel(
     }
 
     fun startConnectingTransitionToMain() {
-        viewModelScope.launch {
-            _appStage.value = AppStage.CONNECTING_TRANSITION
-            delay(1850)
-            prefs?.edit()?.putBoolean("onboarding_completed", true)?.apply()
-            _appStage.value = AppStage.MAIN_ENCLAVE
-        }
+        prefs?.edit()?.putBoolean("onboarding_v2_shown", true)?.apply()
+        _appStage.value = AppStage.MAIN_ENCLAVE
     }
 
     fun replayOnboarding() {
+        _isRegistrationCompleted.value = false
         _appStage.value = AppStage.WELCOME
     }
 
     fun toggleTheme() {
         val next = !_isDarkTheme.value
         _isDarkTheme.value = next
-        prefs?.edit()?.putBoolean("is_dark_theme", next)?.apply()
+        prefs?.edit()?.putBoolean("is_dark_theme_v2", next)?.apply()
     }
 
     fun setDarkTheme(dark: Boolean) {
         _isDarkTheme.value = dark
-        prefs?.edit()?.putBoolean("is_dark_theme", dark)?.apply()
+        prefs?.edit()?.putBoolean("is_dark_theme_v2", dark)?.apply()
     }
 
     fun toggleLanguage() {
@@ -735,11 +930,13 @@ class VpnViewModel(
 
     class Factory(
         private val repository: VpnRepository,
-        private val prefs: SharedPreferences? = null
+        private val prefs: SharedPreferences? = null,
+        private val accountDao: AccountDao? = null,
+        private val accountRepository: AccountRepository? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
-            return VpnViewModel(repository, prefs) as T
+            return VpnViewModel(repository, prefs, accountDao, accountRepository) as T
         }
     }
 }

@@ -1,9 +1,13 @@
 package com.example.ui.screens
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectHorizontalDragGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -14,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -22,14 +27,18 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.HelpOutline
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.MoreHoriz
+import androidx.compose.material.icons.filled.PushPin
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.SwapVert
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -42,6 +51,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -50,6 +60,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.AnnotatedString
@@ -63,6 +74,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.example.data.VlessParser
 import com.example.data.VlessServerEntity
+import com.example.ui.components.CountryFlagSquare
 import com.example.ui.components.IncyPingGaugeIcon
 import com.example.ui.components.MonochromeFistIcon
 import com.example.ui.theme.JetBrainsMonoFontFamily
@@ -110,14 +122,17 @@ fun ServersScreen(
     var sortByPingAsc by remember { mutableStateOf(true) }
     var selectedProtocolChip by remember { mutableStateOf("All") }
 
+    val pinnedCount = remember(allServers) { allServers.count { it.isFavorite } }
+
     val displayedServers = remember(servers, sortByPingAsc, selectedProtocolChip) {
         val protoFiltered = when (selectedProtocolChip) {
+            "PINNED" -> servers.filter { it.isFavorite }
             "VLESS" -> servers.filter { it.protocol.equals("VLESS", ignoreCase = true) }
             "Shadowsocks" -> servers.filter { it.protocol.equals("Shadowsocks", ignoreCase = true) }
             else -> servers
         }
         if (sortByPingAsc) {
-            protoFiltered.sortedBy { it.pingMs }
+            protoFiltered.sortedWith(compareByDescending<VlessServerEntity> { it.isFavorite }.thenBy { it.pingMs })
         } else {
             protoFiltered.sortedByDescending { it.id }
         }
@@ -143,36 +158,38 @@ fun ServersScreen(
     ) {
         Spacer(modifier = Modifier.height(12.dp))
 
-        // 1. Incy Top Header Row: "Servers" + compact action buttons (^, ⇅, ↻, Custom Ping Gauge, +)
+        // 1. NoteVault Top Header Row: "Серверы / Servers" + right circular White '+' button & actions
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text(
-                text = "Servers",
-                fontFamily = SpaceGroteskFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 26.sp,
-                color = colors.primaryInk
-            )
+            Column {
+                Text(
+                    text = if (isEnglish) "Servers" else "Серверы",
+                    fontFamily = SpaceGroteskFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 28.sp,
+                    color = colors.primaryInk
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = if (isEnglish) {
+                        "${allServers.size} · $pinnedCount pinned · $providerCount providers"
+                    } else {
+                        "${allServers.size} серв. · $pinnedCount закреп. · свайп вправо для действий"
+                    },
+                    fontFamily = PlusJakartaFontFamily,
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 12.5.sp,
+                    color = colors.secondaryText
+                )
+            }
 
             Row(
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                IncyTopActionButton(
-                    icon = if (allExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
-                    contentDescription = "Collapse / Expand",
-                    onClick = { allExpanded = !allExpanded },
-                    testTag = "incy_collapse_all_button"
-                )
-                IncyTopActionButton(
-                    icon = Icons.Default.SwapVert,
-                    contentDescription = "Sort",
-                    onClick = { sortByPingAsc = !sortByPingAsc },
-                    testTag = "incy_sort_button"
-                )
                 IncyTopActionButton(
                     icon = Icons.Default.Refresh,
                     contentDescription = "Update Subscriptions",
@@ -184,40 +201,154 @@ fun ServersScreen(
                     onClick = onPingAll,
                     testTag = "ping_all_servers_button"
                 )
+                // NoteVault Circular White '+' Button (Screenshot 2 & Video 3)
                 Surface(
                     modifier = Modifier
-                        .width(40.dp)
-                        .height(35.dp)
-                        .clip(RoundedCornerShape(11.dp))
+                        .size(38.dp)
+                        .clip(CircleShape)
                         .clickable(onClick = onAddServerClick)
                         .testTag("add_vless_server_button"),
                     color = colors.primaryInk,
-                    shape = RoundedCornerShape(11.dp)
+                    shape = CircleShape
                 ) {
                     Box(contentAlignment = Alignment.Center) {
                         Icon(
                             imageVector = Icons.Default.Add,
                             contentDescription = "Add Subscription or Key",
                             tint = colors.onPrimaryInk,
-                            modifier = Modifier.size(19.dp)
+                            modifier = Modifier.size(20.dp)
                         )
                     }
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
-
-        // 2. Subtitle: "1 servers · 1 providers"
-        Text(
-            text = "${allServers.size} servers · $providerCount providers",
-            fontFamily = PlusJakartaFontFamily,
-            fontWeight = FontWeight.Medium,
-            fontSize = 13.sp,
-            color = colors.secondaryText
-        )
-
         Spacer(modifier = Modifier.height(12.dp))
+
+        // 2. NoteVault Filter Pills: "Все 48", "📌 Закреплённые 1", "VLESS", "+" (Screenshot 2 & Video 3)
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Pill 1: All / Все
+            val isAllSelected = selectedProtocolChip == "All"
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (isAllSelected) colors.cardElevated else colors.card)
+                    .border(
+                        1.dp,
+                        if (isAllSelected) colors.primaryInk.copy(alpha = 0.45f) else colors.border,
+                        RoundedCornerShape(50)
+                    )
+                    .clickable { selectedProtocolChip = "All" }
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = if (isEnglish) "All" else "Все",
+                        fontFamily = PlusJakartaFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = if (isAllSelected) colors.primaryInk else colors.secondaryText
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "${allServers.size}",
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        color = colors.mutedText
+                    )
+                }
+            }
+
+            // Pill 2: Pinned / Закреплённые (with orange pin icon from Video 3)
+            val isPinnedSelected = selectedProtocolChip == "PINNED"
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (isPinnedSelected) colors.cardElevated else colors.card)
+                    .border(
+                        1.dp,
+                        if (isPinnedSelected) Color(0xFFE87D2F) else colors.border,
+                        RoundedCornerShape(50)
+                    )
+                    .clickable { selectedProtocolChip = "PINNED" }
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.PushPin,
+                        contentDescription = null,
+                        tint = Color(0xFFE87D2F),
+                        modifier = Modifier.size(13.dp)
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = if (isEnglish) "Pinned" else "Закреплённые",
+                        fontFamily = PlusJakartaFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 13.sp,
+                        color = if (isPinnedSelected) colors.primaryInk else colors.secondaryText
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                    Text(
+                        text = "$pinnedCount",
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontWeight = FontWeight.SemiBold,
+                        fontSize = 12.sp,
+                        color = colors.mutedText
+                    )
+                }
+            }
+
+            // Pill 3: VLESS
+            val isVlessSelected = selectedProtocolChip == "VLESS"
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .background(if (isVlessSelected) colors.cardElevated else colors.card)
+                    .border(
+                        1.dp,
+                        if (isVlessSelected) colors.primaryInk.copy(alpha = 0.45f) else colors.border,
+                        RoundedCornerShape(50)
+                    )
+                    .clickable { selectedProtocolChip = "VLESS" }
+                    .padding(horizontal = 14.dp, vertical = 7.dp)
+            ) {
+                Text(
+                    text = "VLESS",
+                    fontFamily = PlusJakartaFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = if (isVlessSelected) colors.primaryInk else colors.secondaryText
+                )
+            }
+
+            // Pill 4: NoteVault '+' Chip
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(colors.card)
+                    .border(1.dp, colors.border, CircleShape)
+                    .clickable(onClick = onAddServerClick),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Add,
+                    contentDescription = "Add",
+                    tint = colors.secondaryText,
+                    modifier = Modifier.size(16.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(10.dp))
 
         // 3. Search Bar: "Search servers..."
         OutlinedTextField(
@@ -225,9 +356,9 @@ fun ServersScreen(
             onValueChange = onSearchChange,
             placeholder = {
                 Text(
-                    text = "Search servers...",
+                    text = if (isEnglish) "Search servers..." else "Поиск серверов...",
                     fontFamily = PlusJakartaFontFamily,
-                    fontSize = 15.sp,
+                    fontSize = 14.sp,
                     color = colors.mutedText
                 )
             },
@@ -236,7 +367,7 @@ fun ServersScreen(
                     imageVector = Icons.Default.Search,
                     contentDescription = "Search",
                     tint = colors.secondaryText,
-                    modifier = Modifier.size(20.dp)
+                    modifier = Modifier.size(18.dp)
                 )
             },
             trailingIcon = {
@@ -254,7 +385,7 @@ fun ServersScreen(
             modifier = Modifier
                 .fillMaxWidth()
                 .testTag("server_search_input"),
-            shape = RoundedCornerShape(16.dp),
+            shape = RoundedCornerShape(14.dp),
             colors = OutlinedTextFieldDefaults.colors(
                 focusedBorderColor = colors.primaryInk,
                 unfocusedBorderColor = colors.border,
@@ -264,41 +395,6 @@ fun ServersScreen(
         )
 
         Spacer(modifier = Modifier.height(12.dp))
-
-        // 4. Protocol Filter Chips: "All", "VLESS", "Shadowsocks"
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .horizontalScroll(rememberScrollState()),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            val chips = listOf("All", "VLESS", "Shadowsocks")
-            chips.forEach { chip ->
-                val isSelected = selectedProtocolChip == chip
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(if (isSelected) colors.primaryInk else colors.card)
-                        .border(
-                            1.dp,
-                            if (isSelected) colors.primaryInk else colors.border,
-                            RoundedCornerShape(12.dp)
-                        )
-                        .clickable { selectedProtocolChip = chip }
-                        .padding(horizontal = 16.dp, vertical = 9.dp)
-                ) {
-                    Text(
-                        text = chip,
-                        fontFamily = PlusJakartaFontFamily,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 13.sp,
-                        color = if (isSelected) colors.onPrimaryInk else colors.primaryInk
-                    )
-                }
-            }
-        }
-
-        Spacer(modifier = Modifier.height(14.dp))
 
         // 5. Incy Provider / Subscription Cards List
         LazyColumn(
@@ -349,7 +445,8 @@ fun ServersScreen(
                         onCopyNodeUri = { srv ->
                             clipboardManager.setText(AnnotatedString(VlessParser.toUri(srv)))
                             onCopiedMessage("VLESS URI скопирован")
-                        }
+                        },
+                        onToggleFavoriteNode = onToggleFavorite
                     )
                 }
             }
@@ -469,7 +566,8 @@ internal fun IncyProviderGroupCard(
     onPingNode: (VlessServerEntity) -> Unit,
     onInspectNode: (VlessServerEntity) -> Unit,
     onDeleteNode: (VlessServerEntity) -> Unit,
-    onCopyNodeUri: (VlessServerEntity) -> Unit
+    onCopyNodeUri: (VlessServerEntity) -> Unit,
+    onToggleFavoriteNode: (VlessServerEntity) -> Unit = {}
 ) {
     val colors = LocalAstralColors.current
     var localExpanded by remember(forceExpanded) { mutableStateOf(forceExpanded) }
@@ -488,6 +586,9 @@ internal fun IncyProviderGroupCard(
                 .padding(16.dp)
         ) {
             // Card Top Row: Chevron + Title on Left | "1h" + Refresh + Custom Ping Gauge + More (...) on Right
+            val clippedTitle = remember(providerTitle) {
+                if (providerTitle.length > 20) providerTitle.take(20).trimEnd() + "…" else providerTitle
+            }
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -495,6 +596,8 @@ internal fun IncyProviderGroupCard(
             ) {
                 Row(
                     modifier = Modifier
+                        .weight(1f)
+                        .padding(end = 8.dp)
                         .clip(RoundedCornerShape(10.dp))
                         .clickable { localExpanded = !localExpanded }
                         .padding(vertical = 4.dp, horizontal = 2.dp),
@@ -512,11 +615,13 @@ internal fun IncyProviderGroupCard(
                     )
                     Spacer(modifier = Modifier.width(6.dp))
                     Text(
-                        text = providerTitle,
+                        text = clippedTitle,
                         fontFamily = SpaceGroteskFontFamily,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 18.sp,
-                        color = colors.primaryInk
+                        fontSize = 16.5.sp,
+                        color = colors.primaryInk,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                 }
 
@@ -527,8 +632,10 @@ internal fun IncyProviderGroupCard(
                     Text(
                         text = lastUpdatedLabel,
                         fontFamily = JetBrainsMonoFontFamily,
-                        fontSize = 12.sp,
-                        color = colors.mutedText
+                        fontSize = 11.5.sp,
+                        color = colors.mutedText,
+                        maxLines = 1,
+                        softWrap = false
                     )
 
                     IncyCircleIconButton(
@@ -699,7 +806,7 @@ internal fun IncyProviderGroupCard(
 
                     Spacer(modifier = Modifier.height(10.dp))
 
-                    // Individual Server Rows inside the Provider Card
+                    // Individual Server Rows inside the Provider Card (NoteVault Swipe-to-Action Cards)
                     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         nodes.forEach { server ->
                             val isSelected = server.id == selectedServerId
@@ -712,7 +819,9 @@ internal fun IncyProviderGroupCard(
                                 onSelect = { onSelectNode(server) },
                                 onPing = { onPingNode(server) },
                                 onInspect = { onInspectNode(server) },
-                                onDelete = { onDeleteNode(server) }
+                                onDelete = { onDeleteNode(server) },
+                                onTogglePin = { onToggleFavoriteNode(server) },
+                                onShareUri = { onCopyNodeUri(server) }
                             )
                         }
                     }
@@ -769,6 +878,14 @@ private fun IncyCirclePingButton(
     }
 }
 
+/**
+ * NoteVault-Style Swipeable Server Card (1:1 with Video 3 & Screenshot 2):
+ * - Swiping the card right reveals the 3 circular action buttons on the left:
+ *   1. Orange Pin Circle (#E87D2F) -> pins/unpins the server to "Pinned / Закреплённые"
+ *   2. Dark-Grey Share Circle (#262832) -> copies/shares the vless:// key
+ *   3. Red Delete Circle (#E53935) -> deletes the server node
+ * - Displays an orange pin badge next to the title when pinned!
+ */
 @Composable
 private fun IncyServerNodeRow(
     server: VlessServerEntity,
@@ -777,142 +894,251 @@ private fun IncyServerNodeRow(
     isEnglish: Boolean,
     onSelect: () -> Unit,
     onPing: () -> Unit,
-    onInspect: () -> Unit,
-    onDelete: () -> Unit
+    @Suppress("UNUSED_PARAMETER") onInspect: () -> Unit,
+    onDelete: () -> Unit,
+    onTogglePin: () -> Unit = {},
+    onShareUri: () -> Unit = {}
 ) {
     val colors = LocalAstralColors.current
+    var isActionRevealed by remember { mutableStateOf(false) }
+    var dragAccumulated by remember { mutableFloatStateOf(0f) }
 
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (isSelected) colors.cardElevated else Color.Transparent)
-            .border(
-                width = if (isSelected) 1.2.dp else 0.dp,
-                color = if (isSelected) colors.primaryInk else Color.Transparent,
-                shape = RoundedCornerShape(16.dp)
-            )
-            .clickable(onClick = onSelect)
-            .padding(horizontal = 10.dp, vertical = 10.dp)
-            .testTag("server_card_${server.countryCode}_${server.id}"),
-        verticalAlignment = Alignment.CenterVertically
+    val cardOffsetX by animateDpAsState(
+        targetValue = if (isActionRevealed) 146.dp else 0.dp,
+        animationSpec = spring(
+            dampingRatio = Spring.DampingRatioMediumBouncy,
+            stiffness = Spring.StiffnessMediumLow
+        ),
+        label = "notevault_swipe_offset"
+    )
+
+    Box(
+        modifier = Modifier.fillMaxWidth(),
+        contentAlignment = Alignment.CenterStart
     ) {
-        // Left Country Box: shows Country Flag + Country Code instead of a generic server rack icon!
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(RoundedCornerShape(12.dp))
-                .background(if (isSelected) colors.primaryInk else colors.cardElevated)
-                .border(1.dp, colors.border, RoundedCornerShape(12.dp))
-                .clickable(onClick = onInspect),
-            contentAlignment = Alignment.Center
+        // Underlying 3 Circular Swipe Actions (Orange Pin, Grey Share, Red Delete — Video 3 @ 0:10-0:20)
+        Row(
+            modifier = Modifier.padding(start = 4.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
+            // 1. Orange Pin Circle (#E87D2F)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE87D2F))
+                    .clickable {
+                        onTogglePin()
+                        isActionRevealed = false
+                    },
+                contentAlignment = Alignment.Center
             ) {
-                Text(
-                    text = server.flagEmoji,
-                    fontSize = 18.sp,
-                    textAlign = TextAlign.Center
+                Icon(
+                    imageVector = Icons.Default.PushPin,
+                    contentDescription = "Pin",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
                 )
-                Text(
-                    text = server.countryCode.uppercase(),
-                    fontFamily = JetBrainsMonoFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 8.5.sp,
-                    lineHeight = 9.sp,
-                    color = if (isSelected) colors.onPrimaryInk else colors.secondaryText
+            }
+
+            // 2. Dark-Grey Share Circle (#262832)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFF262832))
+                    .border(1.dp, colors.border, CircleShape)
+                    .clickable {
+                        onShareUri()
+                        isActionRevealed = false
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Share,
+                    contentDescription = "Share",
+                    tint = Color.White,
+                    modifier = Modifier.size(17.dp)
+                )
+            }
+
+            // 3. Red Delete Circle (#E53935)
+            Box(
+                modifier = Modifier
+                    .size(40.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFE53935))
+                    .clickable {
+                        isActionRevealed = false
+                        onDelete()
+                    },
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.Delete,
+                    contentDescription = "Delete",
+                    tint = Color.White,
+                    modifier = Modifier.size(18.dp)
                 )
             }
         }
 
-        Spacer(modifier = Modifier.width(12.dp))
-
-        // Center Server Title (Remark / Country) + "VLESS · TCP · JSON" subtitle
-        Column(modifier = Modifier.weight(1f)) {
-            Text(
-                text = server.displayTitle(isEnglish),
-                fontFamily = SpaceGroteskFontFamily,
-                fontWeight = FontWeight.Bold,
-                fontSize = 15.5.sp,
-                color = colors.primaryInk,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
+        // Foreground NoteVault Card
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .offset(x = cardOffsetX)
+                .clip(RoundedCornerShape(18.dp))
+                .background(if (isSelected) colors.cardElevated else colors.surface)
+                .border(
+                    width = if (isSelected) 1.3.dp else 1.dp,
+                    color = if (isSelected) colors.primaryInk else colors.border,
+                    shape = RoundedCornerShape(18.dp)
+                )
+                .pointerInput(server.id) {
+                    detectHorizontalDragGestures(
+                        onDragStart = { dragAccumulated = 0f },
+                        onHorizontalDrag = { change, dragAmount ->
+                            change.consume()
+                            dragAccumulated += dragAmount
+                            if (dragAccumulated > 36f) {
+                                isActionRevealed = true
+                            } else if (dragAccumulated < -28f) {
+                                isActionRevealed = false
+                            }
+                        }
+                    )
+                }
+                .clickable {
+                    if (isActionRevealed) {
+                        isActionRevealed = false
+                    } else {
+                        onSelect()
+                    }
+                }
+                .padding(horizontal = 12.dp, vertical = 11.dp)
+                .testTag("server_card_${server.countryCode}_${server.id}"),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Left Country Square: painted in the real flag colors of the country, no click action
+            CountryFlagSquare(
+                countryCode = server.countryCode,
+                size = 42.dp,
+                cornerRadius = 12.dp,
+                isSelected = isSelected
             )
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = buildAnnotatedString {
-                    withStyle(
-                        SpanStyle(
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontWeight = FontWeight.Bold,
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Center Server Title + Orange Pin Indicator + "VLESS · TCP · JSON" subtitle
+            Column(modifier = Modifier.weight(1f)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (server.isFavorite) {
+                        Icon(
+                            imageVector = Icons.Default.PushPin,
+                            contentDescription = "Pinned",
+                            tint = Color(0xFFE87D2F),
+                            modifier = Modifier
+                                .size(13.dp)
+                                .padding(end = 3.dp)
+                        )
+                    }
+                    Text(
+                        text = server.displayTitle(isEnglish),
+                        fontFamily = SpaceGroteskFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.5.sp,
+                        color = colors.primaryInk,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = buildAnnotatedString {
+                        withStyle(
+                            SpanStyle(
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.primaryInk
+                            )
+                        ) {
+                            append(server.protocol.uppercase())
+                        }
+                        withStyle(
+                            SpanStyle(
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = FontWeight.Normal,
+                                color = colors.secondaryText
+                            )
+                        ) {
+                            append(" · ${server.networkType.uppercase()} · ")
+                        }
+                        withStyle(
+                            SpanStyle(
+                                fontFamily = JetBrainsMonoFontFamily,
+                                fontWeight = FontWeight.Bold,
+                                color = colors.secondaryText
+                            )
+                        ) {
+                            append(if (server.isCustom) server.host else "JSON")
+                        }
+                    },
+                    fontSize = 11.5.sp,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            // Right Live TCP Latency Readout + NoteVault Chevron `>`
+            if (server.countryCode != "INFO") {
+                val pingColor = when {
+                    isPinging -> colors.secondaryText
+                    server.pingMs in 1..85 -> colors.activeGreen
+                    server.pingMs in 86..190 -> Color(0xFFF59E0B)
+                    server.pingMs > 190 -> Color(0xFFEF4444)
+                    else -> Color(0xFFEF4444).copy(alpha = 0.78f)
+                }
+                val pingLabel = when {
+                    isPinging -> "•••"
+                    server.pingMs > 0 -> "${server.pingMs} ms"
+                    else -> if (isEnglish) "timeout" else "таймаут"
+                }
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(8.dp))
+                        .clickable(onClick = onPing)
+                        .padding(horizontal = 6.dp, vertical = 4.dp)
+                ) {
+                    if (isPinging) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(12.dp),
+                            strokeWidth = 1.6.dp,
                             color = colors.primaryInk
                         )
-                    ) {
-                        append(server.protocol.uppercase())
+                        Spacer(modifier = Modifier.width(5.dp))
                     }
-                    withStyle(
-                        SpanStyle(
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontWeight = FontWeight.Normal,
-                            color = colors.secondaryText
-                        )
-                    ) {
-                        append(" · ${server.networkType.uppercase()} · ")
-                    }
-                    withStyle(
-                        SpanStyle(
-                            fontFamily = JetBrainsMonoFontFamily,
-                            fontWeight = FontWeight.Bold,
-                            color = colors.secondaryText
-                        )
-                    ) {
-                        append(if (server.isCustom) server.host else "JSON")
-                    }
-                },
-                fontSize = 11.5.sp,
-                maxLines = 1,
-                overflow = TextOverflow.Ellipsis
-            )
-        }
-
-        // Right Live TCP Latency Readout ("28 ms", spinner when testing, or "timeout" when unreachable)
-        if (server.countryCode != "INFO") {
-            val pingColor = when {
-                isPinging -> colors.secondaryText
-                server.pingMs in 1..85 -> colors.activeGreen
-                server.pingMs in 86..190 -> Color(0xFFF59E0B)
-                server.pingMs > 190 -> Color(0xFFEF4444)
-                else -> Color(0xFFEF4444).copy(alpha = 0.78f)
-            }
-            val pingLabel = when {
-                isPinging -> "•••"
-                server.pingMs > 0 -> "${server.pingMs} ms"
-                else -> if (isEnglish) "timeout" else "таймаут"
-            }
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable(onClick = onPing)
-                    .padding(horizontal = 6.dp, vertical = 4.dp)
-            ) {
-                if (isPinging) {
-                    CircularProgressIndicator(
-                        modifier = Modifier.size(12.dp),
-                        strokeWidth = 1.6.dp,
-                        color = colors.primaryInk
+                    Text(
+                        text = pingLabel,
+                        fontFamily = JetBrainsMonoFontFamily,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 12.5.sp,
+                        color = pingColor,
+                        maxLines = 1,
+                        softWrap = false
                     )
-                    Spacer(modifier = Modifier.width(5.dp))
+                    Spacer(modifier = Modifier.width(3.dp))
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
+                        contentDescription = "Actions",
+                        tint = colors.mutedText,
+                        modifier = Modifier
+                            .size(16.dp)
+                            .clickable { isActionRevealed = !isActionRevealed }
+                    )
                 }
-                Text(
-                    text = pingLabel,
-                    fontFamily = JetBrainsMonoFontFamily,
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 13.sp,
-                    color = pingColor
-                )
             }
         }
     }

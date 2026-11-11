@@ -4,21 +4,34 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.graphics.Color
 
-// Legacy aliases kept for compatibility if referenced
-val ObsidianBackground = Color(0xFF070B12)
-val ObsidianSurface = Color(0xFF0E1522)
-val ObsidianCard = Color(0xFF141D2E)
-val ObsidianCardElevated = Color(0xFF1B273D)
-val ObsidianBorder = Color(0xFF23324D)
-val ElectricCyan = Color(0xFF00F0FF)
-val NeonEmerald = Color(0xFF10B981)
-val NeonEmeraldGlow = Color(0xFF34D399)
-val CyberPurple = Color(0xFF8B5CF6)
-val AmberWarning = Color(0xFFF59E0B)
-val CoralAlert = Color(0xFFEF4444)
-val TextPrimary = Color(0xFFF8FAFC)
-val TextSecondary = Color(0xFF94A3B8)
-val TextMuted = Color(0xFF64748B)
+// Apple iOS OLED Pure Black Tokens
+val IosPureBlack = Color(0xFF000000)
+val IosSurfacePrimary = Color(0xFF121214)
+val IosSurfaceSecondary = Color(0xFF1C1C1E)
+val IosSurfaceElevated = Color(0xFF242426)
+val IosBorderSubtle = Color(0x14FFFFFF) // 1px solid rgba(255, 255, 255, 0.08)
+val IosTextPrimary = Color(0xFFFFFFFF)
+val IosTextSecondary = Color(0xFF8E8E93)
+val IosTextMuted = Color(0xFF48484A)
+val IosGreen = Color(0xFF30D158)
+val IosOrange = Color(0xFFFF9F0A)
+val IosRed = Color(0xFFFF453A)
+
+// Legacy aliases kept for backwards compatibility
+val ObsidianBackground = IosPureBlack
+val ObsidianSurface = IosSurfacePrimary
+val ObsidianCard = IosSurfaceSecondary
+val ObsidianCardElevated = IosSurfaceElevated
+val ObsidianBorder = IosBorderSubtle
+val ElectricCyan = Color(0xFF38BDF8)
+val NeonEmerald = IosGreen
+val NeonEmeraldGlow = IosGreen
+val CyberPurple = Color(0xFFA78BFA)
+val AmberWarning = IosOrange
+val CoralAlert = IosRed
+val TextPrimary = IosTextPrimary
+val TextSecondary = IosTextSecondary
+val TextMuted = IosTextMuted
 
 @Immutable
 data class AstralColors(
@@ -28,8 +41,8 @@ data class AstralColors(
     val card: Color,
     val cardElevated: Color,
     val border: Color,
-    val primaryInk: Color,       // White on dark, Black on light
-    val onPrimaryInk: Color,     // Black on dark, White on light
+    val primaryInk: Color,       // Crisp soft white on dark, deep charcoal on light
+    val onPrimaryInk: Color,     // Deep charcoal on dark, pure white on light
     val secondaryText: Color,
     val mutedText: Color,
     val watermark: Color,
@@ -38,38 +51,40 @@ data class AstralColors(
     val warningOrange: Color
 )
 
+// Apple iOS / SwiftUI OLED Pure Black Dark Palette
 val DarkAstralColors = AstralColors(
     isDark = true,
-    background = Color(0xFF000000),
-    surface = Color(0xFF0B0B0C),
-    card = Color(0xFF121214),
-    cardElevated = Color(0xFF1C1C1F),
-    border = Color(0xFF252529),
+    background = Color(0xFF000000),      // Pure OLED Black
+    surface = Color(0xFF121214),         // Container background
+    card = Color(0xFF1C1C1E),            // Apple secondary system background
+    cardElevated = Color(0xFF242426),    // Elevated card
+    border = Color(0x14FFFFFF),          // rgba(255, 255, 255, 0.08)
     primaryInk = Color(0xFFFFFFFF),
     onPrimaryInk = Color(0xFF000000),
-    secondaryText = Color(0xFF98989F),
-    mutedText = Color(0xFF5E5E66),
-    watermark = Color(0xFF151517),
-    pillBackground = Color(0xFF18181B),
-    activeGreen = Color(0xFF10B981),
-    warningOrange = Color(0xFFF59E0B)
+    secondaryText = Color(0xFF8E8E93),   // Apple secondary label
+    mutedText = Color(0xFF48484A),       // Apple placeholder/muted
+    watermark = Color(0xFF0D0D0F),
+    pillBackground = Color(0xFF1A1A1E),
+    activeGreen = Color(0xFF30D158),     // Apple system green
+    warningOrange = Color(0xFFFF9F0A)    // Apple system orange
 )
 
+// Apple iOS Light Palette
 val LightAstralColors = AstralColors(
     isDark = false,
-    background = Color(0xFFF7F7F7),
-    surface = Color(0xFFF0F0F2),
+    background = Color(0xFFF2F2F7),
+    surface = Color(0xFFFFFFFF),
     card = Color(0xFFFFFFFF),
-    cardElevated = Color(0xFFF2F2F4),
-    border = Color(0xFFE4E4E8),
-    primaryInk = Color(0xFF0D0D0F),
+    cardElevated = Color(0xFFE5E5EA),
+    border = Color(0x1A000000),
+    primaryInk = Color(0xFF000000),
     onPrimaryInk = Color(0xFFFFFFFF),
-    secondaryText = Color(0xFF686870),
-    mutedText = Color(0xFF9A9AA2),
-    watermark = Color(0xFFE8E8EC),
-    pillBackground = Color(0xFFEAEAEF),
-    activeGreen = Color(0xFF059669),
-    warningOrange = Color(0xFFD97706)
+    secondaryText = Color(0xFF8E8E93),
+    mutedText = Color(0xFFC7C7CC),
+    watermark = Color(0xFFE5E5EA),
+    pillBackground = Color(0xFFE5E5EA),
+    activeGreen = Color(0xFF34C759),
+    warningOrange = Color(0xFFFF9500)
 )
 
-val LocalAstralColors = staticCompositionLocalOf { LightAstralColors }
+val LocalAstralColors = staticCompositionLocalOf { DarkAstralColors }

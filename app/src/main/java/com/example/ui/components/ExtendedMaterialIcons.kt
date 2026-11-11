@@ -747,3 +747,65 @@ val Icons.Filled.DeleteSweep: ImageVector
         }
     }.also { _deleteSweep = it }
 private var _deleteSweep: ImageVector? = null
+
+val Icons.Filled.PushPin: ImageVector
+    get() = _pushPin ?: materialIcon(name = "Filled.PushPin") {
+        materialPath {
+            moveTo(16.0f, 9.0f)
+            verticalLineTo(4.0f)
+            horizontalLineToRelative(1.0f)
+            curveToRelative(0.55f, 0.0f, 1.0f, -0.45f, 1.0f, -1.0f)
+            verticalLineToRelative(0.0f)
+            curveToRelative(0.0f, -0.55f, -0.45f, -1.0f, -1.0f, -1.0f)
+            horizontalLineTo(7.0f)
+            curveTo(6.45f, 2.0f, 6.0f, 2.45f, 6.0f, 3.0f)
+            verticalLineToRelative(0.0f)
+            curveToRelative(0.0f, 0.55f, 0.45f, 1.0f, 1.0f, 1.0f)
+            horizontalLineToRelative(1.0f)
+            verticalLineToRelative(5.0f)
+            curveToRelative(0.0f, 1.66f, -1.34f, 3.0f, -3.0f, 3.0f)
+            horizontalLineToRelative(0.0f)
+            verticalLineToRelative(2.0f)
+            horizontalLineToRelative(5.97f)
+            verticalLineToRelative(7.0f)
+            lineToRelative(1.0f, 1.0f)
+            lineToRelative(1.0f, -1.0f)
+            verticalLineToRelative(-7.0f)
+            horizontalLineTo(19.0f)
+            verticalLineToRelative(-2.0f)
+            horizontalLineToRelative(0.0f)
+            curveTo(17.34f, 12.0f, 16.0f, 10.66f, 16.0f, 9.0f)
+            close()
+        }
+    }.also { _pushPin = it }
+private var _pushPin: ImageVector? = null
+
+val Icons.Filled.ErrorOutline: ImageVector
+    get() = _errorOutline ?: materialIcon(name = "Filled.ErrorOutline") {
+        materialPath {
+            moveTo(11.0f, 15.0f)
+            horizontalLineToRelative(2.0f)
+            verticalLineToRelative(2.0f)
+            horizontalLineToRelative(-2.0f)
+            close()
+            moveTo(11.0f, 7.0f)
+            horizontalLineToRelative(2.0f)
+            verticalLineToRelative(6.0f)
+            horizontalLineToRelative(-2.0f)
+            close()
+            moveTo(11.99f, 2.0f)
+            curveTo(6.47f, 2.0f, 2.0f, 6.48f, 2.0f, 12.0f)
+            reflectiveCurveToRelative(4.47f, 10.0f, 9.99f, 10.0f)
+            curveTo(17.52f, 22.0f, 22.0f, 17.52f, 22.0f, 12.0f)
+            reflectiveCurveTo(17.52f, 2.0f, 11.99f, 2.0f)
+            close()
+            moveTo(12.0f, 20.0f)
+            curveToRelative(-4.42f, 0.0f, -8.0f, -3.58f, -8.0f, -8.0f)
+            reflectiveCurveToRelative(3.58f, -8.0f, 8.0f, -8.0f)
+            reflectiveCurveToRelative(8.0f, 3.58f, 8.0f, 8.0f)
+            reflectiveCurveToRelative(-3.58f, 8.0f, -8.0f, 8.0f)
+            close()
+        }
+    }.also { _errorOutline = it }
+private var _errorOutline: ImageVector? = null
+
