@@ -877,17 +877,43 @@ private fun IncyServerNodeRow(
             )
         }
 
-        // Right Ping Readout ("28 ms")
-        Text(
-            text = if (isPinging) "..." else "${server.pingMs} ms",
-            fontFamily = JetBrainsMonoFontFamily,
-            fontWeight = FontWeight.Bold,
-            fontSize = 13.sp,
-            color = if (server.pingMs <= 50) colors.activeGreen else colors.secondaryText,
-            modifier = Modifier
-                .clip(RoundedCornerShape(8.dp))
-                .clickable(onClick = onPing)
-                .padding(horizontal = 6.dp, vertical = 4.dp)
-        )
+        // Right Live TCP Latency Readout ("28 ms", spinner when testing, or "timeout" when unreachable)
+        if (server.countryCode != "INFO") {
+            val pingColor = when {
+                isPinging -> colors.secondaryText
+                server.pingMs in 1..85 -> colors.activeGreen
+                server.pingMs in 86..190 -> Color(0xFFF59E0B)
+                server.pingMs > 190 -> Color(0xFFEF4444)
+                else -> Color(0xFFEF4444).copy(alpha = 0.78f)
+            }
+            val pingLabel = when {
+                isPinging -> "•••"
+                server.pingMs > 0 -> "${server.pingMs} ms"
+                else -> if (isEnglish) "timeout" else "таймаут"
+            }
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable(onClick = onPing)
+                    .padding(horizontal = 6.dp, vertical = 4.dp)
+            ) {
+                if (isPinging) {
+                    CircularProgressIndicator(
+                        modifier = Modifier.size(12.dp),
+                        strokeWidth = 1.6.dp,
+                        color = colors.primaryInk
+                    )
+                    Spacer(modifier = Modifier.width(5.dp))
+                }
+                Text(
+                    text = pingLabel,
+                    fontFamily = JetBrainsMonoFontFamily,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp,
+                    color = pingColor
+                )
+            }
+        }
     }
 }

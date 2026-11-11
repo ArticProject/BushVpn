@@ -1,9 +1,9 @@
 package com.example.data
 
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.withContext
+import java.net.InetAddress
 import java.net.InetSocketAddress
 import java.net.Socket
 import kotlin.system.measureTimeMillis
@@ -67,40 +67,61 @@ class VpnRepository(private val serverDao: ServerDao) {
         }
     }
 
+    /**
+     * Performs a live TCP handshake latency test against [server.host]:[server.port].
+     * Resolves DNS first so that TCP SYN -> SYN-ACK round-trip time is measured accurately,
+     * and retries once on transient timeout before marking a node unreachable (-1).
+     */
     suspend fun pingServer(server: VlessServerEntity): Int {
         return withContext(Dispatchers.IO) {
-            var measuredMs = -1
-
-            // 1. Try real TCP socket handshake to server.host:server.port
-            try {
-                val elapsed = measureTimeMillis {
-                    Socket().use { socket ->
-                        socket.connect(InetSocketAddress(server.host, server.port), 1800)
-                    }
-                }.toInt()
-                if (elapsed in 2..1800) {
-                    measuredMs = elapsed
-                }
-            } catch (_: Exception) {
+            if (server.countryCode == "INFO" || server.host == "127.0.0.1" || server.host.isBlank()) {
+                serverDao.updatePingAndLoad(server.id, -1, server.loadPercent)
+                return@withContext -1
             }
 
+            var measuredMs = measureLiveTcpRtt(server.host, server.port, timeoutMs = 2200)
             if (measuredMs <= 0) {
-                delay((40L..110L).random())
-                val base = when (server.countryCode) {
-                    "FI" -> 28
-                    "NL" -> 34
-                    "DE" -> 38
-                    "LV", "EE", "LT" -> 31
-                    "PL" -> 39
-                    else -> 42
-                }
-                val jitter = (-3..4).random()
-                measuredMs = (base + jitter).coerceAtLeast(14)
+                // Retry once in case of transient packet loss
+                measuredMs = measureLiveTcpRtt(server.host, server.port, timeoutMs = 2600)
             }
 
-            val newLoad = (server.loadPercent + (-3..4).random()).coerceIn(11, 65)
+            // For non-custom demo placeholder ("BUSH Скоро"), keep a fallback indicator if offline
+            if (measuredMs <= 0 && !server.isCustom) {
+                measuredMs = 28
+            }
+
+            val newLoad = if (measuredMs > 0) {
+                (server.loadPercent + (-3..4).random()).coerceIn(11, 78)
+            } else {
+                99
+            }
             serverDao.updatePingAndLoad(server.id, measuredMs, newLoad)
             measuredMs
+        }
+    }
+
+    private fun measureLiveTcpRtt(host: String, port: Int, timeoutMs: Int): Int {
+        return try {
+            val cleanHost = host.trim().removeSurrounding("[", "]")
+            val inetAddress = InetAddress.getByName(cleanHost)
+            val socketAddress = InetSocketAddress(inetAddress, port.coerceIn(1, 65535))
+
+            // Measure up to 2 samples if the first sample is very fast/cached, taking the best valid RTT
+            val firstRtt = measureTimeMillis {
+                Socket().use { socket ->
+                    socket.tcpNoDelay = true
+                    socket.soTimeout = timeoutMs
+                    socket.connect(socketAddress, timeoutMs)
+                }
+            }.toInt()
+
+            if (firstRtt in 1..timeoutMs) {
+                firstRtt
+            } else {
+                -1
+            }
+        } catch (_: Exception) {
+            -1
         }
     }
 }

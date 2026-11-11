@@ -2,85 +2,76 @@ name: Publish Bush VPN APK
 
 on:
   push:
-    branches: [ "main", "master" ]
+    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
-  release-apk:
+  build-and-release:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'temurin'
-          java-version: '21'
-
-      - name: Set up Gradle 9.3.1
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          gradle-version: '9.3.1'
-
-      - name: Prepare Keystore and Xray-core (libv2ray.aar)
+      - name: Assemble & Sign Bush VPN v2.0 APK (with Native Xray-Core v26)
         run: |
-          if [ -f debug.keystore.base64 ]; then
-            base64 -d debug.keystore.base64 > debug.keystore
+          set -e
+          echo "Downloading AndroidLibXrayLite v26.10.31 native Xray-core..."
+          curl -L -sS -o /tmp/libv2ray.aar "https://github.com/2dust/AndroidLibXrayLite/releases/download/v26.10.31/libv2ray.aar"
+
+          python3 scripts/assemble_v2_apk.py
+
+          BT_DIR=$(ls -d $ANDROID_HOME/build-tools/* | sort -V | tail -n 1)
+          echo "Using build-tools: $BT_DIR"
+
+          if [ -f "debug.keystore.base64" ]; then
+            base64 -d debug.keystore.base64 > /tmp/debug.keystore
+          else
+            cp debug.keystore /tmp/debug.keystore
           fi
-          mkdir -p app/libs
-          python3 - << 'EOF'
-          import urllib.request, zipfile, io, os
-          url = "https://github.com/2dust/AndroidLibXrayLite/releases/download/v26.10.31/libv2ray.aar"
-          req = urllib.request.Request(url, headers={"User-Agent": "Mozilla/5.0"})
-          data = urllib.request.urlopen(req, timeout=60).read()
-          keep = {
-              "AndroidManifest.xml",
-              "classes.jar",
-              "R.txt",
-              "proguard.txt",
-              "jni/arm64-v8a/libgojni.so"
-          }
-          with zipfile.ZipFile(io.BytesIO(data), "r") as zin:
-              with zipfile.ZipFile("app/libs/libv2ray.aar", "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as zout:
-                  for item in zin.infolist():
-                      if item.filename in keep:
-                          zout.writestr(item, zin.read(item.filename))
-          print("Prepared app/libs/libv2ray.aar:", os.path.getsize("app/libs/libv2ray.aar"))
-          EOF
 
-      - name: Build Bush VPN v2.0 APK
-        run: |
-          gradle assembleDebug --no-daemon
-          cp -f app/build/outputs/apk/debug/app-debug.apk Bush-VPN.apk
-          ls -lh Bush-VPN.apk
+          "$BT_DIR/zipalign" -p -f 4 /tmp/unsigned.apk /tmp/aligned.apk
+          "$BT_DIR/apksigner" sign \
+            --ks /tmp/debug.keystore \
+            --ks-pass pass:android \
+            --key-pass pass:android \
+            --ks-key-alias androiddebugkey \
+            --out Bush-VPN.apk \
+            /tmp/aligned.apk
 
-      - name: Commit updated Bush-VPN.apk v2.0 to repository
+          cp -f Bush-VPN.apk Bush-VPN-v2.0.apk
+          "$BT_DIR/aapt2" dump badging Bush-VPN-v2.0.apk | head -n 5
+          ls -lh Bush-VPN.apk Bush-VPN-v2.0.apk
+
+      - name: Commit Bush-VPN-v2.0.apk and Bush-VPN.apk to repository root
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Bush-VPN.apk
-          git diff --staged --quiet || (git commit -m "chore: update Bush-VPN.apk to v2.0 [skip ci]" && git push)
+          git add Bush-VPN.apk Bush-VPN-v2.0.apk
+          if ! git diff --staged --quiet; then
+            git commit -m "Publish Bush-VPN-v2.0.apk and update Bush-VPN.apk to v2.0 [skip ci]"
+            git push
+          fi
 
-      - name: Upload Bush-VPN.apk to Actions Artifacts
-        uses: actions/upload-artifact@v4
-        with:
-          name: Bush-VPN-APK
-          path: Bush-VPN.apk
-
-      - name: Publish Bush-VPN.apk v2.0 to GitHub Releases
+      - name: Publish Bush-VPN-v2.0.apk to GitHub Releases
         uses: softprops/action-gh-release@v2
         with:
           tag_name: v2.0.0
-          name: "Bush VPN v2.0 (Xray-core Android APK)"
-          body: "Нажми на **Bush-VPN.apk** ниже в разделе Assets, чтобы скачать и установить обновлённое приложение **Bush VPN v2.0** (с рабочим ядром Xray-core и исправленным распознаванием стран)."
-          files: Bush-VPN.apk
+          name: "Bush VPN v2.0 (Latest APK — Xray-Core v26)"
+          body: |
+            ### 📥 Скачать Bush VPN v2.0 для Android
+            Нажмите на **`Bush-VPN-v2.0.apk`** ниже в разделе **Assets**, чтобы скачать и установить актуальную версию **2.0**.
+
+            **Что нового в v2.0:**
+            - ✅ **Настоящий движок Xray-Core v26 (`libv2ray`):** Реальное туннелирование трафика через `VpnService` + `TUN`.
+            - ✅ **Исправлено отображение стран и названий серверов в подписках:** Автоматическое распознавание всех флагов стран Unicode (`🇩🇪`, `🇳🇱`, `🇺🇸`, `🇫🇮`, `🇬🇧`, `🇫🇷`, `🇹🇷`, `🇰🇿` и 40+ стран) и точное отображение названий узлов из подписки (`KosmoVPN` и др.) вместо одинаковых «Финляндия».
+            - ✅ **Живой фоновый TCP-пинг:** Автоматическая проверка реальной задержки серверов.
+          files: |
+            Bush-VPN-v2.0.apk
+            Bush-VPN.apk
           prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          make_latest: true

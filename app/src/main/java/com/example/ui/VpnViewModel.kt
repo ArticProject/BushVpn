@@ -15,6 +15,9 @@ import com.example.data.VpnTunnelSettings
 import com.example.vpn.AetherVpnService
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -24,7 +27,10 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
 import java.text.SimpleDateFormat
@@ -185,6 +191,8 @@ class VpnViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     private var telemetryJob: Job? = null
+    private var latencyMonitorJob: Job? = null
+    private val tcpPingSemaphore = Semaphore(6)
     private var logCounter = 1L
 
     init {
@@ -204,7 +212,7 @@ class VpnViewModel(
 
             if (urlsToRefresh.isNotEmpty()) {
                 urlsToRefresh.forEach { url ->
-                    launch(Dispatchers.IO) {
+                    withContext(Dispatchers.IO) {
                         VlessParser.fetchSubscriptionFromUrl(url).onSuccess { (provider, nodes) ->
                             if (nodes.isNotEmpty()) {
                                 repository.deleteBySubscriptionUrl(url)
@@ -224,7 +232,50 @@ class VpnViewModel(
                     }
                 }
             }
+
+            startBackgroundLatencyMonitor()
         }
+    }
+
+    private fun startBackgroundLatencyMonitor() {
+        latencyMonitorJob?.cancel()
+        latencyMonitorJob = viewModelScope.launch(Dispatchers.IO) {
+            // Initial live TCP latency test on startup
+            delay(400)
+            val initialServers = runCatching { repository.allServers.first() }.getOrDefault(emptyList())
+            if (initialServers.isNotEmpty()) {
+                performConcurrentTcpSweep(initialServers)
+            }
+            // Periodic background live TCP latency check every 25 seconds
+            while (isActive) {
+                delay(25_000L)
+                if (!_isPingingAll.value) {
+                    val currentServers = allServers.value.ifEmpty {
+                        runCatching { repository.allServers.first() }.getOrDefault(emptyList())
+                    }
+                    val testable = currentServers.filter { it.isCustom && it.countryCode != "INFO" }
+                    if (testable.isNotEmpty()) {
+                        performConcurrentTcpSweep(testable)
+                    }
+                }
+            }
+        }
+    }
+
+    private suspend fun performConcurrentTcpSweep(servers: List<VlessServerEntity>) = coroutineScope {
+        val targets = servers.filter { it.countryCode != "INFO" }
+        targets.map { srv ->
+            async(Dispatchers.IO) {
+                tcpPingSemaphore.withPermit {
+                    _pingingServerIds.update { it + srv.id }
+                    try {
+                        repository.pingServer(srv)
+                    } finally {
+                        _pingingServerIds.update { it - srv.id }
+                    }
+                }
+            }
+        }.awaitAll()
     }
 
     fun goToAdvantages() {
@@ -502,18 +553,12 @@ class VpnViewModel(
                 }
             }
 
-            val list = allServers.value
-            list.forEach { srv ->
-                _pingingServerIds.update { it + srv.id }
-                launch {
-                    repository.pingServer(srv)
-                    _pingingServerIds.update { it - srv.id }
-                }
-            }
-            delay(450)
+            val latestServers = runCatching { repository.allServers.first() }.getOrDefault(allServers.value)
+            performConcurrentTcpSweep(latestServers)
             _isPingingAll.value = false
-            val fastest = allServers.value
-                .filter { it.countryCode != "INFO" }
+            val updatedList = runCatching { repository.allServers.first() }.getOrDefault(allServers.value)
+            val fastest = updatedList
+                .filter { it.countryCode != "INFO" && it.pingMs > 0 }
                 .minByOrNull { it.pingMs }
             if (fastest != null) {
                 showMessage("${fastest.flagEmoji} ${fastest.displayTitle(_isEnglish.value)}: ${fastest.pingMs}ms")
@@ -584,8 +629,10 @@ class VpnViewModel(
                     repository.deleteByProviderName(provider)
 
                     var firstId: Long? = null
+                    val insertedNodes = mutableListOf<VlessServerEntity>()
                     nodes.forEach { node ->
                         val id = repository.addServer(node)
+                        insertedNodes.add(node.copy(id = id))
                         if (firstId == null && node.countryCode != "INFO") {
                             firstId = id
                         }
@@ -599,6 +646,10 @@ class VpnViewModel(
                         else "Подписка $provider добавлена (${nodes.size} серв.)"
                     )
                     onSuccess()
+                    // Immediately run live TCP latency tests on the newly imported subscription nodes
+                    launch(Dispatchers.IO) {
+                        performConcurrentTcpSweep(insertedNodes)
+                    }
                 }.onFailure { err ->
                     showMessage(err.message ?: "Ошибка загрузки подписки")
                 }
@@ -611,8 +662,10 @@ class VpnViewModel(
         if (multiNodes.isNotEmpty()) {
             viewModelScope.launch {
                 var firstId: Long? = null
+                val insertedNodes = mutableListOf<VlessServerEntity>()
                 multiNodes.forEach { node ->
                     val id = repository.addServer(node)
+                    insertedNodes.add(node.copy(id = id))
                     if (firstId == null && node.countryCode != "INFO") {
                         firstId = id
                     }
@@ -626,6 +679,9 @@ class VpnViewModel(
                     else "Добавлено серверов: ${multiNodes.size}"
                 )
                 onSuccess()
+                launch(Dispatchers.IO) {
+                    performConcurrentTcpSweep(insertedNodes)
+                }
             }
             return
         }
@@ -639,6 +695,9 @@ class VpnViewModel(
                 prefs?.edit()?.putLong("selected_server_id", newId)?.apply()
                 showMessage("Добавлен: ${parsedServer.displayTitle(_isEnglish.value)}")
                 onSuccess()
+                launch(Dispatchers.IO) {
+                    performConcurrentTcpSweep(listOf(parsedServer.copy(id = newId)))
+                }
             }
         }.onFailure { err ->
             showMessage(err.message ?: "Некорректная ссылка vless:// или подписка")

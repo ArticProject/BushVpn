@@ -270,7 +270,7 @@ object VlessParser {
     }
 
     /**
-     * Parses a raw subscription body (plain text or Base64-encoded list of vless:// and ss:// links).
+     * Parses a raw subscription body (JSON array of Xray configs, plain text, or Base64-encoded list of vless:// and ss:// links).
      */
     fun parseSubscriptionPayload(
         rawPayload: String,
@@ -280,13 +280,27 @@ object VlessParser {
         val trimmed = rawPayload.trim()
         if (trimmed.isEmpty()) return emptyList()
 
-        val candidateText = if (
+        // 1. Check if payload is a JSON array or single JSON object of Xray configs (used by Happ / INCY / v2raytun subscriptions like KosmoVPN)
+        if (trimmed.startsWith("[") || trimmed.startsWith("{")) {
+            val jsonParsed = parseXrayJsonSubscription(trimmed, providerName, subscriptionUrl)
+            if (jsonParsed.isNotEmpty()) {
+                return jsonParsed
+            }
+        }
+
+        val decodedCandidate = if (
             trimmed.contains("vless://", ignoreCase = true) ||
             trimmed.contains("ss://", ignoreCase = true)
         ) {
             trimmed
         } else {
-            val decoded = decodeBase64Safe(trimmed)
+            val decoded = decodeBase64Safe(trimmed).trim()
+            if (decoded.startsWith("[") || decoded.startsWith("{")) {
+                val jsonParsed = parseXrayJsonSubscription(decoded, providerName, subscriptionUrl)
+                if (jsonParsed.isNotEmpty()) {
+                    return jsonParsed
+                }
+            }
             if (decoded.contains("vless://", ignoreCase = true) || decoded.contains("ss://", ignoreCase = true)) {
                 decoded
             } else {
@@ -294,7 +308,7 @@ object VlessParser {
             }
         }
 
-        return candidateText
+        return decodedCandidate
             .lineSequence()
             .map { it.trim() }
             .filter { it.startsWith("vless://", ignoreCase = true) || it.startsWith("ss://", ignoreCase = true) }
@@ -305,11 +319,123 @@ object VlessParser {
                     subscriptionUrl = subscriptionUrl
                 ).getOrNull()
             }
+            .filterNot { srv ->
+                // Filter out dummy 0.0.0.0:1 unsupported-client warning placeholders if real servers exist
+                srv.host == "0.0.0.0" && srv.port == 1
+            }
             .toList()
     }
 
+    private fun parseXrayJsonSubscription(
+        jsonString: String,
+        providerName: String,
+        subscriptionUrl: String
+    ): List<VlessServerEntity> {
+        return runCatching {
+            val items = if (jsonString.trim().startsWith("[")) {
+                JSONArray(jsonString.trim())
+            } else {
+                JSONArray().put(JSONObject(jsonString.trim()))
+            }
+
+            val results = mutableListOf<VlessServerEntity>()
+            for (i in 0 until items.length()) {
+                val obj = items.optJSONObject(i) ?: continue
+                val remark = obj.optString("remarks", obj.optString("remark", "")).trim()
+                val outbounds = obj.optJSONArray("outbounds") ?: continue
+
+                // Find all vless outbounds in this config object; prefer TCP reality if multiple exist (e.g. proxy + reserve)
+                val vlessOutbounds = mutableListOf<JSONObject>()
+                for (j in 0 until outbounds.length()) {
+                    val ob = outbounds.optJSONObject(j) ?: continue
+                    if (ob.optString("protocol").equals("vless", ignoreCase = true)) {
+                        vlessOutbounds.add(ob)
+                    }
+                }
+                val chosenOutbound = vlessOutbounds.firstOrNull { ob ->
+                    ob.optJSONObject("streamSettings")?.optString("network")?.equals("tcp", ignoreCase = true) == true
+                } ?: vlessOutbounds.firstOrNull() ?: continue
+
+                val settingsObj = chosenOutbound.optJSONObject("settings") ?: continue
+                val vnextArr = settingsObj.optJSONArray("vnext") ?: continue
+                val vnext = vnextArr.optJSONObject(0) ?: continue
+                val host = vnext.optString("address", "").trim()
+                val port = vnext.optInt("port", 443)
+                if (host.isBlank() || host == "0.0.0.0") continue
+
+                val usersArr = vnext.optJSONArray("users")
+                val userObj = usersArr?.optJSONObject(0)
+                val uuid = userObj?.optString("id", "")?.trim().orEmpty()
+                if (uuid.isBlank()) continue
+                val encryption = userObj?.optString("encryption", "none")?.trim()?.ifBlank { "none" } ?: "none"
+                val flow = userObj?.optString("flow", "")?.trim().orEmpty()
+
+                val stream = chosenOutbound.optJSONObject("streamSettings")
+                val netType = stream?.optString("network", "tcp")?.trim()?.lowercase()?.ifBlank { "tcp" } ?: "tcp"
+                val secType = stream?.optString("security", "none")?.trim()?.lowercase()?.ifBlank { "none" } ?: "none"
+
+                val realityObj = stream?.optJSONObject("realitySettings")
+                val tlsObj = stream?.optJSONObject("tlsSettings")
+                val sni = (realityObj?.optString("serverName") ?: tlsObj?.optString("serverName") ?: "").trim()
+                val fp = (realityObj?.optString("fingerprint") ?: tlsObj?.optString("fingerprint") ?: "chrome").trim().ifBlank { "chrome" }
+                val pbk = realityObj?.optString("publicKey", "")?.trim().orEmpty()
+                val sid = realityObj?.optString("shortId", "")?.trim().orEmpty()
+                val spx = realityObj?.optString("spiderX", "")?.trim().orEmpty()
+
+                val wsObj = stream?.optJSONObject("wsSettings")
+                val xhttpObj = stream?.optJSONObject("xhttpSettings")
+                val grpcObj = stream?.optJSONObject("grpcSettings")
+                val path = (xhttpObj?.optString("path") ?: wsObj?.optString("path") ?: "/").trim().ifBlank { "/" }
+                val wsHost = (xhttpObj?.optString("host") ?: wsObj?.optJSONObject("headers")?.optString("Host") ?: "").trim()
+                val grpcService = grpcObj?.optString("serviceName", "")?.trim().orEmpty()
+
+                val detectedCountry = detectCountry(remark, host)
+                val displayName = remark.ifBlank { "${detectedCountry.nameRu} ($host)" }
+
+                results.add(
+                    VlessServerEntity(
+                        name = displayName,
+                        countryCode = detectedCountry.code,
+                        countryName = detectedCountry.nameRu,
+                        city = detectedCountry.cityRu,
+                        flagEmoji = detectedCountry.flag,
+                        host = host,
+                        port = port,
+                        uuid = uuid,
+                        encryption = encryption,
+                        security = secType,
+                        flow = flow,
+                        networkType = netType,
+                        sni = sni,
+                        fingerprint = fp,
+                        publicKey = pbk,
+                        shortId = sid,
+                        spiderX = spx,
+                        wsPath = path,
+                        wsHost = wsHost,
+                        grpcServiceName = grpcService,
+                        alpn = "",
+                        pingMs = (28..58).random(),
+                        loadPercent = (14..38).random(),
+                        bandwidthGbps = 10,
+                        isFavorite = true,
+                        isCustom = true,
+                        category = "Custom",
+                        virtualIp = generateVirtualIp(host),
+                        mapX = detectedCountry.mapX,
+                        mapY = detectedCountry.mapY,
+                        providerName = providerName.ifBlank { "SUBSCRIPTION" },
+                        protocol = "VLESS",
+                        subscriptionUrl = subscriptionUrl
+                    )
+                )
+            }
+            results
+        }.getOrDefault(emptyList())
+    }
+
     /**
-     * Fetches a live Incy / Happ / Xray subscription URL over HTTP/HTTPS and parses all nodes.
+     * Fetches a live Incy / Happ / v2raytun / Xray subscription URL over HTTP/HTTPS and parses all nodes.
      */
     fun fetchSubscriptionFromUrl(rawUrl: String): Result<Pair<String, List<VlessServerEntity>>> {
         return runCatching {
@@ -326,7 +452,11 @@ object VlessParser {
                 requestMethod = "GET"
                 connectTimeout = 8000
                 readTimeout = 8000
-                setRequestProperty("User-Agent", "Happ/1.4 (Android; Xray-core)")
+                setRequestProperty("User-Agent", "v2raytun/3.10.28 (Android)")
+                setRequestProperty("x-hwid", "a1b2c3d4e5f60718")
+                setRequestProperty("x-device-os", "Android")
+                setRequestProperty("x-ver-os", "14")
+                setRequestProperty("x-device-model", "Pixel 8")
                 setRequestProperty("Accept", "*/*")
             }
 
@@ -335,10 +465,11 @@ object VlessParser {
                 val profileTitleHeader = conn.getHeaderField("profile-title")
                     ?: conn.getHeaderField("Profile-Title")
                 val resolvedProvider = if (!profileTitleHeader.isNullOrBlank()) {
-                    if (profileTitleHeader.startsWith("base64:", ignoreCase = true)) {
-                        decodeBase64Safe(profileTitleHeader.substringAfter(":")).ifBlank { defaultProvider }
+                    val trimmedTitle = profileTitleHeader.trim()
+                    if (trimmedTitle.startsWith("base64:", ignoreCase = true)) {
+                        decodeBase64Safe(trimmedTitle.substringAfter(":")).trim().ifBlank { defaultProvider }
                     } else {
-                        decodeUrlComponentSafe(profileTitleHeader.trim()).ifBlank { defaultProvider }
+                        decodeUrlComponentSafe(trimmedTitle).trim().ifBlank { defaultProvider }
                     }
                 } else {
                     defaultProvider
@@ -359,13 +490,7 @@ object VlessParser {
                 conn.disconnect()
             }
 
-            val fallbackNodes = DefaultServers.getEuropeSubscriptionNodes().map {
-                it.copy(
-                    providerName = defaultProvider,
-                    subscriptionUrl = cleanUrl
-                )
-            }
-            defaultProvider to fallbackNodes
+            throw IllegalArgumentException("Не удалось загрузить серверы по ссылке подписки")
         }
     }
 
@@ -619,6 +744,7 @@ object VlessParser {
                         }
                         "xhttp", "splithttp" -> {
                             put("xhttpSettings", JSONObject().apply {
+                                put("mode", "auto")
                                 put("path", server.wsPath.ifBlank { "/" })
                                 val hostHeader = server.wsHost.ifBlank { server.sni }
                                 if (hostHeader.isNotBlank()) {

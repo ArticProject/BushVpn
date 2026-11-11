@@ -165,7 +165,7 @@ fun DashboardScreen(
                     )
                     Spacer(modifier = Modifier.width(10.dp))
                     Text(
-                        text = "BUSH VPN",
+                        text = "BUSH VPN 2.0",
                         fontFamily = SpaceGroteskFontFamily,
                         fontWeight = FontWeight.Bold,
                         fontSize = 22.sp,
